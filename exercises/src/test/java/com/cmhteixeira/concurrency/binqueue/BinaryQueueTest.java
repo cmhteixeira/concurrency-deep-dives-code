@@ -88,8 +88,8 @@ public class BinaryQueueTest {
         var prioQueue = new PriorityQueue<>(new TimerTaskComparable());
         int max = 56555;
         int min = 1;
-        int maxIter = 17;
-        int minIter = 1;
+        int maxIter = 1700000;
+        int minIter = 1700000;
         int iter = (int) ((Math.random() * (maxIter - minIter)) + minIter);
         int iter2 = iter;
         System.out.printf("Number iterations: %d. Max Value: %d. Min Value: %d%n", iter, max, min);
