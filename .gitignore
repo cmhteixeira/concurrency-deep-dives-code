@@ -1,7 +1,7 @@
 *.class
 *.log
 .idea
-
+build
 *iml
 target
 

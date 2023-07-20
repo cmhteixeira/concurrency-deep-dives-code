@@ -1,9 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <groupId>com.cmhteixeira</groupId>
   <artifactId>concurrency-exercices</artifactId>
   <version>0.1.0-SNAPSHOT</version>
@@ -12,6 +9,7 @@
 
   <modules>
     <module>exercises</module>
+    <module>benchmark</module>
   </modules>
 
   <properties>
@@ -19,7 +17,6 @@
     <encoding>UTF-8</encoding>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
-
     <!--    todo: seems ot be correct one.-->
     <scala.version>2.13.10</scala.version>
     <scala.compat.version>2.13</scala.compat.version>
@@ -29,7 +26,8 @@
     <akka.actor.version>2.6.5</akka.actor.version>
     <scodec.version>1.1.22</scodec.version>
     <jline.version>3.22.0</jline.version>
-    <junit.version>4.12</junit.version>
+    <junit.version>5.9.1</junit.version>
+    <junit5perf.version>1.35.0</junit5perf.version>
     <google.guava.version>31.1-jre</google.guava.version>
     <java.tuples.version>1.2</java.tuples.version>
     <spotless.plugin>2.36.0</spotless.plugin>
@@ -37,7 +35,8 @@
   </properties>
 
   <build>
-    <pluginManagement><!-- lock down plugins versions to avoid using Maven defaults (may be moved to parent pom) -->
+    <pluginManagement>
+      <!-- lock down plugins versions to avoid using Maven defaults (may be moved to parent pom) -->
       <plugins>
         <plugin>
           <!-- see http://davidb.github.com/scala-maven-plugin -->
@@ -59,7 +58,6 @@
             </execution>
           </executions>
         </plugin>
-
         <!-- clean lifecycle, see https://maven.apache.org/ref/current/maven-core/lifecycles.html#clean_Lifecycle -->
         <plugin>
           <artifactId>maven-clean-plugin</artifactId>
@@ -74,10 +72,12 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.0</version>
           <configuration>
-            <compilerArgs>
-              <arg>--enable-preview</arg>
-            </compilerArgs>
-<!--            <skip>true</skip>-->
+<!--            <compilerArgs>-->
+<!--                            -->
+<!--              <arg>&#45;&#45;enable-preview</arg>-->
+<!--                          -->
+<!--            </compilerArgs>-->
+            <!--            <skip>true</skip>-->
           </configuration>
         </plugin>
         <plugin>
@@ -121,8 +121,10 @@
           <configuration>
             <java>
               <googleJavaFormat>
-                <version>${google.java.formatter}</version>                      <!-- optional, 1.8 is minimum supported version -->
-                <style>GOOGLE</style>                       <!-- or AOSP (optional) -->
+                <version>${google.java.formatter}</version>
+                <!-- optional, 1.8 is minimum supported version -->
+                <style>GOOGLE</style>
+                <!-- or AOSP (optional) -->
               </googleJavaFormat>
             </java>
           </configuration>
@@ -161,7 +163,8 @@
         <artifactId>logback-classic</artifactId>
         <version>1.1.0</version>
       </dependency>
-      <dependency> <!--TODO: Only to print hex-string representation of sha-1 output. Consider another way-->
+      <dependency>
+        <!--TODO: Only to print hex-string representation of sha-1 output. Consider another way-->
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
         <version>1.15</version>
@@ -191,11 +194,10 @@
         <artifactId>javatuples</artifactId>
         <version>${java.tuples.version}</version>
       </dependency>
-
       <!-- Test -->
       <dependency>
-        <groupId>junit</groupId>
-        <artifactId>junit</artifactId>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-engine</artifactId>
         <version>${junit.version}</version>
         <scope>test</scope>
       </dependency>
@@ -207,5 +209,4 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
-
 </project>
