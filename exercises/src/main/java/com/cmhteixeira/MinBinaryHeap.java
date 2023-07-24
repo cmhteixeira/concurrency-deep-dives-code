@@ -1,6 +1,7 @@
 package com.cmhteixeira;
 
 import java.util.Comparator;
+import java.util.NoSuchElementException;
 
 public final class MinBinaryHeap<E> {
   private static final int DEFAULT_CAPACITY = 1024;
@@ -22,8 +23,7 @@ public final class MinBinaryHeap<E> {
   }
 
   private void insertInternal(E elem) {
-    ++numberElem;
-    queue[numberElem - 1] = elem;
+    queue[++numberElem - 1] = elem;
     perculateUp();
   }
 
@@ -92,11 +92,10 @@ public final class MinBinaryHeap<E> {
   }
 
   public E popMin() {
-    if (numberElem == 0) throw new RuntimeException("No elements");
+    if (numberElem == 0) throw new NoSuchElementException("No elements");
     E elemToReturn = queue[0];
     queue[0] = queue[numberElem - 1];
-    queue[numberElem - 1] = null;
-    --numberElem;
+    queue[--numberElem] = null;
     perculateDown();
     return elemToReturn;
   }
@@ -111,28 +110,5 @@ public final class MinBinaryHeap<E> {
 
   private int indexParent(int index) {
     return (int) Math.floor(index * 1.0 / 2);
-  }
-
-  /**
-   * Method that calculates the floor of the log, base 2, of 'x'. The calculation is performed in
-   * integer arithmetic, therefore, it is exact.
-   *
-   * @param x The value to calculate log2 on.
-   * @return floor(log ( x)/log(2)), calculated in an exact way.
-   */
-  public static int log2(int x) {
-    int y, v;
-    // No log of 0 or negative
-    if (x <= 0) {
-      throw new IllegalArgumentException("" + x + " <= 0");
-    }
-    // Calculate log2 (it's actually floor log2)
-    v = x;
-    y = -1;
-    while (v > 0) {
-      v >>= 1;
-      y++;
-    }
-    return y;
   }
 }
