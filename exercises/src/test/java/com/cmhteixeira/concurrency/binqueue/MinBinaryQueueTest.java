@@ -46,6 +46,24 @@ public class MinBinaryQueueTest {
   }
 
   @Test
+  public void removalOrderIsCorrect() {
+    var minHeap = new MinBinaryHeap<Integer>(Comparator.naturalOrder());
+    minHeap.insert(3);
+    minHeap.insert(4);
+    minHeap.insert(6);
+    minHeap.insert(1);
+    minHeap.insert(2);
+    minHeap.insert(5);
+
+    assertEquals(minHeap.popMin(), 1);
+    assertEquals(minHeap.popMin(), 2);
+    assertEquals(minHeap.popMin(), 3);
+    assertEquals(minHeap.popMin(), 4);
+    assertEquals(minHeap.popMin(), 5);
+    assertEquals(minHeap.popMin(), 6);
+  }
+
+  @Test
   public void insertNewMinToCompleteLevel() {
     var minHeap = new MinBinaryHeap<Integer>(Comparator.naturalOrder());
     minHeap.insert(3);

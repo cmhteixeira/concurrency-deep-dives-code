@@ -101,14 +101,14 @@ public final class MinBinaryHeap<E> {
   }
 
   private int indexChildL(int index) {
-    return 2 * index;
-  }
-
-  private int indexChildR(int index) {
     return 2 * index + 1;
   }
 
+  private int indexChildR(int index) {
+    return 2 * index + 2;
+  }
+
   private int indexParent(int index) {
-    return (int) Math.floor(index * 1.0 / 2);
+    return (int) Math.ceil(index * 1.0 / 2) - 1;
   }
 }
