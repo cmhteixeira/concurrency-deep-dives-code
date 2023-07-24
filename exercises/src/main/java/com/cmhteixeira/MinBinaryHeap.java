@@ -45,45 +45,38 @@ public final class MinBinaryHeap<E> {
   }
 
   private void perculateUp() {
-    int indexElem = numberElem - 1;
+    int iC = numberElem - 1; // index of child
 
-    while (indexElem > 0) {
-      var indexParent = indexParent(indexElem);
-      var valueCurrent = queue[indexElem];
-      var valueParent = queue[indexParent];
-      if (comparator.compare(valueCurrent, valueParent) <= 0) {
-        queue[indexElem] = valueParent;
-        queue[indexParent] = valueCurrent;
-        indexElem = indexParent;
-      } else break;
+    while (iC > 0) {
+      var iP = indexParent(iC); // index of parent
+      var valueC = queue[iC];
+      var valueP = queue[iP];
+      if (comparator.compare(valueC, valueP) >= 0) break;
+      queue[iC] = valueP;
+      queue[iP] = valueC;
+      iC = iP;
     }
   }
 
   private void perculateDown() {
-    int indexElem = 0;
+    int iP = 0; // index of parent
 
-    while (indexElem < numberElem - 1) {
-      var indexChildL = indexChildL(indexElem);
-      var indexChildR = indexChildR(indexElem);
-      if (indexChildL > numberElem - 1) break;
-
-      int indexChosenChild;
-
-      if (indexChildR > numberElem - 1) {
-        indexChosenChild = indexChildL;
-      } else {
-        if (comparator.compare(queue[indexChildL], queue[indexChildR]) <= 0)
-          indexChosenChild = indexChildL;
-        else indexChosenChild = indexChildR;
+    while (indexChildL(iP) <= numberElem - 1) {
+      var iL = indexChildL(iP);
+      var iR = indexChildR(iP);
+      int iC; // index of child
+      if (iR > numberElem - 1) iC = iL;
+      else {
+        if (comparator.compare(queue[iL], queue[iR]) <= 0) iC = iL;
+        else iC = iR;
       }
 
-      var valueCurrent = queue[indexElem];
-      var valueChosenChild = queue[indexChosenChild];
-
-      if (comparator.compare(valueCurrent, valueChosenChild) <= 0) break;
-      queue[indexChosenChild] = valueCurrent;
-      queue[indexElem] = valueChosenChild;
-      indexElem = indexChosenChild;
+      var valueP = queue[iP]; // value of parent
+      var valueC = queue[iC]; // value of child
+      if (comparator.compare(valueP, valueC) <= 0) break;
+      queue[iC] = valueP;
+      queue[iP] = valueC;
+      iP = iC;
     }
   }
 
