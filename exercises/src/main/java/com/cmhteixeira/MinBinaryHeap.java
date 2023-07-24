@@ -2,7 +2,7 @@ package com.cmhteixeira;
 
 import java.util.Comparator;
 
-public final class MyPriorityBlockingQueue<E> {
+public final class MinBinaryHeap<E> {
   private static final int DEFAULT_CAPACITY = 1024;
 
   private final Comparator<? super E> comparator;
@@ -11,13 +11,13 @@ public final class MyPriorityBlockingQueue<E> {
 
   private int numberElem;
 
-  public MyPriorityBlockingQueue(int initialCapacity, Comparator<? super E> comparator) {
+  public MinBinaryHeap(int initialCapacity, Comparator<? super E> comparator) {
     this.comparator = comparator;
     this.numberElem = 0;
     queue = (E[]) new Object[initialCapacity];
   }
 
-  public MyPriorityBlockingQueue(Comparator<? super E> comparator) {
+  public MinBinaryHeap(Comparator<? super E> comparator) {
     this(DEFAULT_CAPACITY, comparator);
   }
 
