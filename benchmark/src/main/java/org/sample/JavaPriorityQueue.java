@@ -1,7 +1,7 @@
 package org.sample;
 
-import com.cmhteixeira.MinBinaryHeap;
 import java.util.Comparator;
+import java.util.PriorityQueue;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.runner.Runner;
@@ -16,7 +16,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Fork(
     value = 1,
     jvmArgs = {"-Xms15G"})
-public class MyBinaryHeap {
+public class JavaPriorityQueue {
 
   int max = 99_999_999;
   int min = 1;
@@ -24,14 +24,14 @@ public class MyBinaryHeap {
   @Param({"1000", "10000", "100000", "1000000", "3000000", "7000000", "10000000"})
   private int n;
 
-  MinBinaryHeap<Integer> queue;
+  PriorityQueue<Integer> queue;
 
   @Setup(Level.Iteration)
   public void setup() {
-    queue = new MinBinaryHeap<>(Comparator.naturalOrder());
+    queue = new PriorityQueue<>(Comparator.naturalOrder());
     for (int j = 0; j < n; ++j) {
       int randomWithMathRandom = (int) ((Math.random() * (max - min)) + min);
-      queue.insert(randomWithMathRandom);
+      queue.offer(randomWithMathRandom);
     }
   }
 
@@ -39,7 +39,7 @@ public class MyBinaryHeap {
   @BenchmarkMode({Mode.SingleShotTime})
   @Measurement(iterations = 100)
   public void deleteMin() {
-    queue.popMin();
+    queue.remove();
   }
 
   @Benchmark
@@ -47,13 +47,13 @@ public class MyBinaryHeap {
   @Measurement(iterations = 100)
   public void insert() {
     int randomWithMathRandom = (int) ((Math.random() * (max - min)) + min);
-    queue.insert(randomWithMathRandom);
+    queue.offer(randomWithMathRandom);
   }
 
   public static void main(String[] args) throws RunnerException {
     Options opt =
         new OptionsBuilder()
-            .include(MyBinaryHeap.class.getSimpleName())
+            .include(JavaPriorityQueue.class.getSimpleName())
             .forks(1)
             .threads(1)
             .build();

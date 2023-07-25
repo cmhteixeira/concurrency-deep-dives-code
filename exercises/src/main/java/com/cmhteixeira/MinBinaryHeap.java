@@ -49,11 +49,8 @@ public final class MinBinaryHeap<E> {
 
     while (iC > 0) {
       var iP = indexParent(iC); // index of parent
-      var valueC = queue[iC];
-      var valueP = queue[iP];
-      if (comparator.compare(valueC, valueP) >= 0) break;
-      queue[iC] = valueP;
-      queue[iP] = valueC;
+      if (lower(iP, iC)) break;
+      swap(iC, iP);
       iC = iP;
     }
   }
@@ -65,19 +62,23 @@ public final class MinBinaryHeap<E> {
       var iL = indexChildL(iP);
       var iR = indexChildR(iP);
       int iC; // index of child
-      if (iR > numberElem - 1) iC = iL;
-      else {
-        if (comparator.compare(queue[iL], queue[iR]) <= 0) iC = iL;
-        else iC = iR;
-      }
+      if (iR <= numberElem - 1 && lower(iR, iL)) iC = iR;
+      else iC = iL;
 
-      var valueP = queue[iP]; // value of parent
-      var valueC = queue[iC]; // value of child
-      if (comparator.compare(valueP, valueC) <= 0) break;
-      queue[iC] = valueP;
-      queue[iP] = valueC;
+      if (lower(iP, iC)) break;
+      swap(iC, iP);
       iP = iC;
     }
+  }
+
+  private boolean lower(int i, int j) {
+    return comparator.compare(queue[i], queue[j]) < 0;
+  }
+
+  private void swap(int i, int j) {
+    E savedI = queue[i];
+    queue[i] = queue[j];
+    queue[j] = savedI;
   }
 
   public E findMin() {
