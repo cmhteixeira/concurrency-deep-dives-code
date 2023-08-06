@@ -1,5 +1,3 @@
 package com.cmhteixeira.concurrency;
 
-public class MyConcurrentHashMapTest {
-
-}
+public class MyConcurrentHashMapTest {}

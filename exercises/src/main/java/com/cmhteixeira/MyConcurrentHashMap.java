@@ -10,12 +10,12 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
   private int m; // number of buckets
   private int n; // number of elements
 
-  private LinkedList<?>[] backingArray;
+  private LinkedList<Entry<K, V>>[] backingArray;
 
   public MyConcurrentHashMap() {
     this.m = DEFAULT_CAPACITY;
     this.n = 0;
-    this.backingArray = (LinkedList<Entry>[]) new Object[DEFAULT_CAPACITY];
+    this.backingArray = (LinkedList<Entry<K, V>>[]) new Object[DEFAULT_CAPACITY];
   }
 
   private int bucket(Object obj) {
@@ -50,6 +50,29 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
   @Override
   public V put(K key, V value) {
     int bucket = bucket(key);
+    //    backingArray[]
+  }
+
+  private V putInternal(K key, V value) {
+    int bucket = bucket(key);
+    var t = backingArray[bucket];
+    if (t == null || t.isEmpty()) {
+      LinkedList<Entry<K, V>> chain = new LinkedList<>();
+      chain.add(new MyEntry(key, value));
+      backingArray[bucket] = chain;
+      return null;
+    } else {
+      for (int i = 0; i < t.size(); ++i) {
+        Entry<K, V> entry = t.get(0);
+        if (entry.getKey() == key) {
+          V res = entry.getValue();
+          entry.setValue(value);
+          return res;
+        }
+      }
+      t.add(new MyEntry(key, value));
+      return null;
+    }
   }
 
   @Override
@@ -98,13 +121,31 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
     return null;
   }
 
-  private class MyEntry {
-    K key;
-    List<V> chain;
+  private class MyEntry implements Map.Entry<K, V> {
 
-    MyEntry(K key, List<V> chain) {
-      this.chain = chain;
+    K key;
+    V value;
+
+    MyEntry(K key, V value) {
       this.key = key;
+      this.value = value;
+    }
+
+    @Override
+    public K getKey() {
+      return this.key;
+    }
+
+    @Override
+    public V getValue() {
+      return this.value;
+    }
+
+    @Override
+    public V setValue(V value) {
+      V res = this.value;
+      this.value = value;
+      return res;
     }
   }
 }
