@@ -10,26 +10,26 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
   private int m; // number of buckets
   private int n; // number of elements
 
-  private MyEntry[] backingArray;
+  private LinkedList<?>[] backingArray;
 
   public MyConcurrentHashMap() {
     this.m = DEFAULT_CAPACITY;
     this.n = 0;
-    this.backingArray = (MyEntry[]) new Object[DEFAULT_CAPACITY];
+    this.backingArray = (LinkedList<Entry>[]) new Object[DEFAULT_CAPACITY];
   }
 
-  private int universalHashing(Object obj) {
+  private int bucket(Object obj) {
     return obj.hashCode() % m;
   }
 
   @Override
   public int size() {
-    return 0;
+    return n;
   }
 
   @Override
   public boolean isEmpty() {
-    return false;
+    return n == 0;
   }
 
   @Override
@@ -49,7 +49,7 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
 
   @Override
   public V put(K key, V value) {
-    return null;
+    int bucket = bucket(key);
   }
 
   @Override
