@@ -13,13 +13,16 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
   private LinkedList<Entry<K, V>>[] backingArray;
 
   public MyConcurrentHashMap() {
-    //    this.m = DEFAULT_CAPACITY;
-    this.n = 0;
-    this.backingArray = (LinkedList<Entry<K, V>>[]) new LinkedList[DEFAULT_CAPACITY];
+    this(DEFAULT_CAPACITY);
   }
 
-  private int bucket(Object obj) {
-    return (int) ((obj.hashCode() & 0x00000000ffffffffL) % m());
+  public MyConcurrentHashMap(int initialCapacity) {
+    this.n = 0;
+    this.backingArray = (LinkedList<Entry<K, V>>[]) new LinkedList[initialCapacity];
+  }
+
+  private static int bucket(Object obj, int m) {
+    return (int) ((obj.hashCode() & 0x00000000ffffffffL) % m);
   }
 
   @Override
@@ -49,11 +52,11 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
 
   @Override
   public V get(Object key) {
-    int bucket = bucket(key);
+    int bucket = bucket(key, m());
     var chain = backingArray[bucket];
     if (chain == null) return null;
     for (int i = 0; i < chain.size(); ++i) {
-      Entry<K, V> entry = chain.get(0);
+      Entry<K, V> entry = chain.get(i);
       if (entry.getKey() == key) return entry.getValue();
     }
     return null;
@@ -69,16 +72,22 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
     double loadFactor = (double) this.n / m();
     if (loadFactor > 0.75) {
       int newCapacity = m() * 2;
-      LinkedList<Map.Entry<K, V>>[] newArray = (LinkedList<Entry<K, V>>[]) new Object[newCapacity];
-      System.arraycopy(backingArray, 0, newArray, 0, m());
+      LinkedList<Map.Entry<K, V>>[] newArray =
+          (LinkedList<Entry<K, V>>[]) new LinkedList[newCapacity];
+      for (LinkedList<Entry<K, V>> chain : backingArray) {
+        if (chain != null) {
+          for (Entry<K, V> entry : chain) {
+            putInternal2(entry.getKey(), entry.getValue(), newArray);
+          }
+        }
+      }
       backingArray = newArray;
-      // TODO: I have to re-hash everything.
-      return null;
-    } else return putInternal(key, value);
+    }
+    return putInternal(key, value);
   }
 
   private V putInternal(K key, V value) {
-    int bucket = bucket(key);
+    int bucket = bucket(key, m());
     var t = backingArray[bucket];
     if (t == null || t.isEmpty()) {
       LinkedList<Entry<K, V>> chain = new LinkedList<>();
@@ -99,9 +108,30 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
     return null;
   }
 
+  private static <K, V> V putInternal2(K key, V value, LinkedList<Entry<K, V>>[] backingArray) {
+    int bucket = bucket(key, backingArray.length);
+    var t = backingArray[bucket];
+    if (t == null || t.isEmpty()) {
+      LinkedList<Entry<K, V>> chain = new LinkedList<>();
+      chain.add(new MyEntry<>(key, value));
+      backingArray[bucket] = chain;
+    } else {
+      for (int i = 0; i < t.size(); ++i) {
+        Entry<K, V> entry = t.get(0);
+        if (entry.getKey() == key) {
+          V res = entry.getValue();
+          entry.setValue(value);
+          return res;
+        }
+      }
+      t.add(new MyEntry<>(key, value));
+    }
+    return null;
+  }
+
   @Override
   public V remove(Object key) {
-    int bucket = bucket(key);
+    int bucket = bucket(key, m());
     var t = backingArray[bucket];
     if (t == null || t.isEmpty()) return null;
     else {
@@ -153,7 +183,7 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
 
   @Override
   public boolean remove(Object key, Object value) {
-    int bucket = bucket(key);
+    int bucket = bucket(key, m());
     var t = backingArray[bucket];
     if (t == null || t.isEmpty()) return false;
     else {
@@ -178,7 +208,7 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
     throw new UnsupportedOperationException("Concurrency not yet implemented.");
   }
 
-  private class MyEntry implements Map.Entry<K, V> {
+  private static class MyEntry<K, V> implements Map.Entry<K, V> {
 
     K key;
     V value;

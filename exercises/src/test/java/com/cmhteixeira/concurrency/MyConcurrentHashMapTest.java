@@ -3,7 +3,7 @@ package com.cmhteixeira.concurrency;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.cmhteixeira.MyConcurrentHashMap;
-import java.util.Map;
+import java.util.*;
 import org.junit.jupiter.api.Test;
 
 public class MyConcurrentHashMapTest {
@@ -59,5 +59,20 @@ public class MyConcurrentHashMapTest {
     map.clear();
     assertEquals(0, map.size());
     assertFalse(map.containsKey("foo"));
+  }
+
+  @Test
+  public void randomTest() {
+    var myMap = new MyConcurrentHashMap<>(10);
+    int maxIter = 10_000;
+    Set<Map.Entry<String, Integer>> entries = new HashSet<>();
+    for (int i = 1; i <= maxIter; ++i) {
+      Map.Entry<String, Integer> entry = Map.entry(UUID.randomUUID().toString(), i);
+      entries.add(entry);
+      myMap.put(entry.getKey(), entry.getValue());
+    }
+    for (Map.Entry<String, Integer> entry : entries) {
+      assertTrue(myMap.containsKey(entry.getKey()));
+    }
   }
 }
