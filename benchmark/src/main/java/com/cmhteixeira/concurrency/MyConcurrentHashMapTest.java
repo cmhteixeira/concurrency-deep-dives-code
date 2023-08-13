@@ -1,7 +1,8 @@
 package com.cmhteixeira.concurrency;
 
-import com.cmhteixeira.MinBinaryHeap;
-import java.util.Comparator;
+import com.cmhteixeira.MyConcurrentHashMap;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.runner.Runner;
@@ -12,42 +13,30 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @State(Scope.Thread)
 @Threads(1)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
-@Warmup(iterations = 50)
+@Warmup(iterations = 25, time = 2, timeUnit = TimeUnit.SECONDS)
 @Fork(
     value = 1,
     jvmArgs = {"-Xms15G"})
-public class MyConcurrentHashMap {
+public class MyConcurrentHashMapTest {
 
   int max = 99_999_999;
   int min = 1;
 
-  @Param({"1000", "10000", "100000", "1000000", "3000000", "7000000", "10000000"})
-  private int n;
-
-  MinBinaryHeap<Integer> queue;
+  MyConcurrentHashMap<String, Integer> map;
 
   @Setup(Level.Iteration)
   public void setup() {
-    queue = new MinBinaryHeap<>(Comparator.naturalOrder());
-    for (int j = 0; j < n; ++j) {
-      int randomWithMathRandom = (int) ((Math.random() * (max - min)) + min);
-      queue.insert(randomWithMathRandom);
-    }
+    map = new MyConcurrentHashMap<>();
   }
 
   @Benchmark
-  @BenchmarkMode({Mode.SingleShotTime})
-  @Measurement(iterations = 100)
-  public void deleteMin() {
-    queue.popMin();
-  }
-
-  @Benchmark
-  @BenchmarkMode({Mode.SingleShotTime})
-  @Measurement(iterations = 100)
+  @BenchmarkMode({Mode.Throughput})
+  @Measurement(iterations = 25, time = 2, timeUnit = TimeUnit.SECONDS)
   public void insert() {
     int randomWithMathRandom = (int) ((Math.random() * (max - min)) + min);
-    queue.insert(randomWithMathRandom);
+    Map.Entry<String, Integer> entry =
+        Map.entry(UUID.randomUUID().toString(), randomWithMathRandom);
+    map.put(entry.getKey(), entry.getValue());
   }
 
   public static void main(String[] args) throws RunnerException {
