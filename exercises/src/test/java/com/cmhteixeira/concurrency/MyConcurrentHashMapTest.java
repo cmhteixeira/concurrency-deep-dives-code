@@ -62,9 +62,23 @@ public class MyConcurrentHashMapTest {
   }
 
   @Test
+  public void sameHash() {
+    Map<DummyKey, Integer> map = new MyConcurrentHashMap<>(3);
+    map.put(new DummyKey("foo-1"), 1);
+    map.put(new DummyKey("foo-2"), 2);
+    map.put(new DummyKey("bar-3"), 3);
+    map.put(new DummyKey("bar-4"), 4);
+    assertEquals(4, map.size());
+    assertTrue(map.containsKey(new DummyKey("foo-1")));
+    assertTrue(map.containsKey(new DummyKey("foo-2")));
+    assertTrue(map.containsKey(new DummyKey("bar-3")));
+    assertTrue(map.containsKey(new DummyKey("bar-4")));
+  }
+
+  @Test
   public void randomTest() {
     var myMap = new MyConcurrentHashMap<>(10);
-    int maxIter = 10_000;
+    int maxIter = 100_000;
     Set<Map.Entry<String, Integer>> entries = new HashSet<>();
     for (int i = 1; i <= maxIter; ++i) {
       Map.Entry<String, Integer> entry = Map.entry(UUID.randomUUID().toString(), i);
@@ -73,6 +87,32 @@ public class MyConcurrentHashMapTest {
     }
     for (Map.Entry<String, Integer> entry : entries) {
       assertTrue(myMap.containsKey(entry.getKey()));
+    }
+  }
+
+  private static class DummyKey {
+    String i;
+
+    DummyKey(String i) {
+      this.i = i;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (o == null) return false;
+      if (o.getClass() != DummyKey.class) return false;
+      return ((DummyKey) o).i.equals(this.i);
+    }
+
+    @Override
+    public String toString() {
+      return i;
+    }
+
+    @Override
+    public int hashCode() {
+      if (i.startsWith("foo")) return "foo".hashCode();
+      else return i.hashCode();
     }
   }
 }

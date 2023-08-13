@@ -5,12 +5,12 @@ import java.util.concurrent.ConcurrentMap;
 
 public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
 
-  private static int DEFAULT_CAPACITY = 1024;
-  private static double TARGET_LOAD_FACTOR = 0.75;
+  private static final int DEFAULT_CAPACITY = 1024;
+  private static final double TARGET_LOAD_FACTOR = 0.75f;
   //  private int m; // number of buckets
   private int n; // number of elements
 
-  private LinkedList<Entry<K, V>>[] backingArray;
+  private Node<K, V>[] table;
 
   public MyConcurrentHashMap() {
     this(DEFAULT_CAPACITY);
@@ -18,7 +18,7 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
 
   public MyConcurrentHashMap(int initialCapacity) {
     this.n = 0;
-    this.backingArray = (LinkedList<Entry<K, V>>[]) new LinkedList[initialCapacity];
+    this.table = new Node[initialCapacity];
   }
 
   private static int bucket(Object obj, int m) {
@@ -42,9 +42,11 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
 
   @Override
   public boolean containsValue(Object value) {
-    for (LinkedList<Entry<K, V>> chain : backingArray) {
+    for (Node<K, V> chain : table) {
       if (chain != null) {
-        if (chain.stream().anyMatch(j -> j.getValue() == value)) return true;
+        do {
+          if (chain.value == value) return true;
+        } while (chain.next != null);
       }
     }
     return false;
@@ -53,99 +55,79 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
   @Override
   public V get(Object key) {
     int bucket = bucket(key, m());
-    var chain = backingArray[bucket];
+    var chain = table[bucket];
     if (chain == null) return null;
-    for (int i = 0; i < chain.size(); ++i) {
-      Entry<K, V> entry = chain.get(i);
-      if (entry.getKey() == key) return entry.getValue();
+    Node<K, V> node = chain;
+    while (node != null) {
+      if (Objects.equals(node.key, key)) return node.getValue();
+      node = node.next;
     }
     return null;
   }
 
   private int m() {
-    return this.backingArray.length;
+    return this.table.length;
   }
 
   @Override
   public V put(K key, V value) {
     if (key == null) throw new IllegalArgumentException("Keys cannot be null");
-    double loadFactor = (double) this.n / m();
-    if (loadFactor > 0.75) {
-      int newCapacity = m() * 2;
-      LinkedList<Map.Entry<K, V>>[] newArray =
-          (LinkedList<Entry<K, V>>[]) new LinkedList[newCapacity];
-      for (LinkedList<Entry<K, V>> chain : backingArray) {
-        if (chain != null) {
-          for (Entry<K, V> entry : chain) {
-            putInternal2(entry.getKey(), entry.getValue(), newArray);
-          }
+    if (((double) this.n / m()) > TARGET_LOAD_FACTOR) {
+      Node<K, V>[] newTable = new Node[m() * 2];
+      for (Node<K, V> chain : table) {
+        Node<K, V> node = chain;
+        while (node != null) {
+          putInternal2(node.getKey(), node.getValue(), newTable);
+          node = node.next;
         }
       }
-      backingArray = newArray;
+      table = newTable;
     }
     return putInternal(key, value);
   }
 
   private V putInternal(K key, V value) {
     int bucket = bucket(key, m());
-    var t = backingArray[bucket];
-    if (t == null || t.isEmpty()) {
-      LinkedList<Entry<K, V>> chain = new LinkedList<>();
-      chain.add(new MyEntry(key, value));
-      backingArray[bucket] = chain;
-    } else {
-      for (int i = 0; i < t.size(); ++i) {
-        Entry<K, V> entry = t.get(0);
-        if (entry.getKey() == key) {
-          V res = entry.getValue();
-          entry.setValue(value);
+    var chain = table[bucket];
+    if (chain == null) table[bucket] = new Node<>(key, value);
+    else {
+      Node<K, V> node = chain;
+      do {
+        if (Objects.equals(node.getKey(), key)) {
+          V res = node.getValue();
+          node.setValue(value);
           return res;
         }
-      }
-      t.add(new MyEntry(key, value));
+        node = node.next;
+      } while (node != null);
+      table[bucket] = new Node<>(key, value, chain);
     }
     ++n;
     return null;
   }
 
-  private static <K, V> V putInternal2(K key, V value, LinkedList<Entry<K, V>>[] backingArray) {
-    int bucket = bucket(key, backingArray.length);
-    var t = backingArray[bucket];
-    if (t == null || t.isEmpty()) {
-      LinkedList<Entry<K, V>> chain = new LinkedList<>();
-      chain.add(new MyEntry<>(key, value));
-      backingArray[bucket] = chain;
-    } else {
-      for (int i = 0; i < t.size(); ++i) {
-        Entry<K, V> entry = t.get(0);
-        if (entry.getKey() == key) {
-          V res = entry.getValue();
-          entry.setValue(value);
+  private static <K, V> V putInternal2(K key, V value, Node<K, V>[] table) {
+    int bucket = bucket(key, table.length);
+    var chain = table[bucket];
+    if (chain == null) table[bucket] = new Node<>(key, value);
+    else {
+      Node<K, V> node = chain;
+      do {
+        if (Objects.equals(node.getKey(), key)) {
+          V res = node.getValue();
+          node.setValue(value);
           return res;
         }
-      }
-      t.add(new MyEntry<>(key, value));
+        node = node.next;
+      } while (node != null);
+      table[bucket] = new Node<>(key, value, chain);
     }
     return null;
   }
 
   @Override
   public V remove(Object key) {
-    int bucket = bucket(key, m());
-    var t = backingArray[bucket];
-    if (t == null || t.isEmpty()) return null;
-    else {
-      for (int i = 0; i < t.size(); ++i) {
-        Entry<K, V> entry = t.get(i);
-        if (entry.getKey() == key) {
-          V res = entry.getValue();
-          t.remove(i);
-          --n;
-          return res;
-        }
-      }
-    }
-    return null;
+    return removeFinal(key, null);
   }
 
   @Override
@@ -157,7 +139,7 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
 
   @Override
   public void clear() {
-    Arrays.fill(backingArray, null);
+    Arrays.fill(table, null);
     n = 0;
   }
 
@@ -183,19 +165,31 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
 
   @Override
   public boolean remove(Object key, Object value) {
+    return removeFinal(key, value) != null;
+  }
+
+  V removeFinal(Object key, Object value) {
     int bucket = bucket(key, m());
-    var t = backingArray[bucket];
-    if (t == null || t.isEmpty()) return false;
-    else {
-      for (int i = 0; i < t.size(); ++i) {
-        Entry<K, V> entry = t.get(i);
-        if (entry.getKey() == key & entry.getValue() == value) {
-          t.remove(i);
-          return true;
-        }
-      }
+    var chain = table[bucket];
+    if (chain == null) return null;
+    if ((chain.key == key && value == null) || (chain.key == key && chain.value == value)) {
+      V res = chain.getValue();
+      table[bucket] = chain.next;
+      --n;
+      return res;
     }
-    return false;
+    Node<K, V> node = chain;
+    while (node.next != null) {
+      if ((node.next.getKey() == key && value == null)
+          || (node.next.getKey() == key && node.next.value == value)) {
+        V res = node.next.getValue();
+        node.next = node.next.next;
+        --n;
+        return res;
+      }
+      node = chain.next;
+    }
+    return null;
   }
 
   @Override
@@ -208,14 +202,22 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
     throw new UnsupportedOperationException("Concurrency not yet implemented.");
   }
 
-  private static class MyEntry<K, V> implements Map.Entry<K, V> {
+  public static class Node<K, V> implements Map.Entry<K, V> {
 
     K key;
     V value;
 
-    MyEntry(K key, V value) {
-      this.key = key;
-      this.value = value;
+    Node<K, V> next;
+
+    public Node(K key, V value) {
+      this.key = Objects.requireNonNull(key);
+      this.value = Objects.requireNonNull(value);
+    }
+
+    public Node(K key, V value, Node<K, V> next) {
+      this.key = Objects.requireNonNull(key);
+      this.value = Objects.requireNonNull(value);
+      this.next = next;
     }
 
     @Override
@@ -233,6 +235,11 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
       V res = this.value;
       this.value = value;
       return res;
+    }
+
+    @Override
+    public String toString() {
+      return "Node{" + "key=" + key + ", value=" + value + ", next=" + next + '}';
     }
   }
 }
