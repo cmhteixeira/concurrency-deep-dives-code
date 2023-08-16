@@ -2,7 +2,7 @@ package com.cmhteixeira.concurrency;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.cmhteixeira.MyConcurrentHashMap;
+import com.cmhteixeira.MyConcurrentHashMap2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +13,7 @@ public class CmhConcurrentHashMapConcurrencyTest {
 
   @Test
   public void sizeAfterInsertRemoval() throws InterruptedException {
-    MyConcurrentHashMap<String, String> map = new MyConcurrentHashMap<>();
+    MyConcurrentHashMap2<String, String> map = new MyConcurrentHashMap2<>();
     int numElems = 1000;
     int numThreads = 24;
     var elems =

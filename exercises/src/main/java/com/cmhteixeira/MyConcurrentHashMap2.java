@@ -3,21 +3,20 @@ package com.cmhteixeira;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 
-public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
+public class MyConcurrentHashMap2<K, V> implements ConcurrentMap<K, V> {
 
   private static final int DEFAULT_CAPACITY = 1024;
   private static final double TARGET_LOAD_FACTOR = 0.75f;
   //  private int m; // number of buckets
   private int n; // number of elements
 
-  private Object globalLock;
   private Node<K, V>[] table;
 
-  public MyConcurrentHashMap() {
+  public MyConcurrentHashMap2() {
     this(DEFAULT_CAPACITY);
   }
 
-  public MyConcurrentHashMap(int initialCapacity) {
+  public MyConcurrentHashMap2(int initialCapacity) {
     this.n = 0;
     this.table = new Node[initialCapacity];
   }
@@ -54,7 +53,7 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
   }
 
   @Override
-  public synchronized V get(Object key) {
+  public V get(Object key) {
     int bucket = bucket(key, m());
     var chain = table[bucket];
     if (chain == null) return null;
@@ -71,7 +70,7 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
   }
 
   @Override
-  public synchronized V put(K key, V value) {
+  public V put(K key, V value) {
     if (key == null) throw new IllegalArgumentException("Keys cannot be null");
     if (((double) this.n / m()) > TARGET_LOAD_FACTOR) {
       Node<K, V>[] newTable = new Node[m() * 2];
@@ -85,17 +84,6 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
       table = newTable;
     }
     return putInternal(key, value);
-  }
-
-  private void resize() {
-    Node<K, V>[] newTable = (Node<K, V>[]) new Node<?, ?>[m() * 2];
-    for (Node<K, V> chain : table) {
-      Node<K, V> node = chain;
-      while (node != null) {
-        putInternal2(node.getKey(), node.getValue(), newTable);
-        node = node.next;
-      }
-    }
   }
 
   private V putInternal(K key, V value) {
@@ -214,7 +202,7 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
     throw new UnsupportedOperationException("Concurrency not yet implemented.");
   }
 
-  public static class Node<K, V> implements Entry<K, V> {
+  public static class Node<K, V> implements Map.Entry<K, V> {
 
     K key;
     V value;
