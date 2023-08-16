@@ -74,15 +74,7 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
   public synchronized V put(K key, V value) {
     if (key == null) throw new IllegalArgumentException("Keys cannot be null");
     if (((double) this.n / m()) > TARGET_LOAD_FACTOR) {
-      Node<K, V>[] newTable = new Node[m() * 2];
-      for (Node<K, V> chain : table) {
-        Node<K, V> node = chain;
-        while (node != null) {
-          putInternal2(node.getKey(), node.getValue(), newTable);
-          node = node.next;
-        }
-      }
-      table = newTable;
+      resize();
     }
     return putInternal(key, value);
   }
@@ -96,26 +88,13 @@ public class MyConcurrentHashMap<K, V> implements ConcurrentMap<K, V> {
         node = node.next;
       }
     }
+    table = newTable;
   }
 
   private V putInternal(K key, V value) {
-    int bucket = bucket(key, m());
-    var chain = table[bucket];
-    if (chain == null) table[bucket] = new Node<>(key, value);
-    else {
-      Node<K, V> node = chain;
-      do {
-        if (Objects.equals(node.getKey(), key)) {
-          V res = node.getValue();
-          node.setValue(value);
-          return res;
-        }
-        node = node.next;
-      } while (node != null);
-      table[bucket] = new Node<>(key, value, chain);
-    }
+    V v = putInternal2(key, value, table);
     ++n;
-    return null;
+    return v;
   }
 
   private static <K, V> V putInternal2(K key, V value, Node<K, V>[] table) {

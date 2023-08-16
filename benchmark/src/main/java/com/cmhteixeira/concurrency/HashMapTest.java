@@ -15,8 +15,9 @@ import org.openjdk.jmh.runner.options.VerboseMode;
 
 public class HashMapTest {
 
-  @Threads(1)
+  @Threads(12)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  @Measurement(iterations = 30)
   public abstract static class AbstractBenchmark {
     @State(Scope.Benchmark)
     public static class BenchmarkState {
@@ -35,6 +36,19 @@ public class HashMapTest {
       String key = new String(res, 0, res.length);
       state.map.put(key, 1);
     }
+
+    //    @Benchmark
+    //    public void insertOrGet(BenchmarkState state) {
+    //      IntStream s = ThreadLocalRandom.current().ints(20, 0, 256);
+    //      int[] res = s.toArray();
+    //      String key = new String(res, 0, res.length);
+    //      boolean put = ThreadLocalRandom.current().nextBoolean();
+    //      if (put) {
+    //        state.map.put(key, 1);
+    //      } else {
+    //        state.map.get(key);
+    //      }
+    //    }
 
     protected abstract Map<String, Integer> obtainMap();
   }

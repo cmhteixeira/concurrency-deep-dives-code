@@ -2,28 +2,28 @@ package com.cmhteixeira.concurrency;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.cmhteixeira.MyConcurrentHashMap2;
+import com.cmhteixeira.MyConcurrentHashMap;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
-public class MyConcurrentHashMap2Test {
+public class MyConcurrentHashMapTest {
 
   @Test
   public void emptyDoesNotContain() {
-    Map<String, String> map = new MyConcurrentHashMap2<>();
+    Map<String, String> map = new MyConcurrentHashMap<>();
     assertNull(map.get("foo"));
   }
 
   @Test
   public void contains() {
-    Map<String, String> map = new MyConcurrentHashMap2<>();
+    Map<String, String> map = new MyConcurrentHashMap<>();
     map.put("foo", "bar");
     assertEquals(map.get("foo"), "bar");
   }
 
   @Test
   public void containsAfterRemove() {
-    Map<String, String> map = new MyConcurrentHashMap2<>();
+    Map<String, String> map = new MyConcurrentHashMap<>();
     map.put("foo", "bar");
     map.remove("foo");
     assertNull(map.get("foo"));
@@ -31,14 +31,14 @@ public class MyConcurrentHashMap2Test {
 
   @Test
   public void size1() {
-    Map<String, String> map = new MyConcurrentHashMap2<>();
+    Map<String, String> map = new MyConcurrentHashMap<>();
     map.put("foo", "bar");
     assertEquals(map.size(), 1);
   }
 
   @Test
   public void sizeAfterInsertRemoval() {
-    Map<String, String> map = new MyConcurrentHashMap2<>();
+    Map<String, String> map = new MyConcurrentHashMap<>();
     map.put("foo", "bar");
     map.put("foo-Bar", "baz");
     map.remove("foo");
@@ -47,14 +47,14 @@ public class MyConcurrentHashMap2Test {
 
   @Test
   public void containsValue() {
-    Map<String, String> map = new MyConcurrentHashMap2<>();
+    Map<String, String> map = new MyConcurrentHashMap<>();
     map.put("foo", "bar");
     assertTrue(map.containsValue("bar"));
   }
 
   @Test
   public void clear() {
-    Map<String, String> map = new MyConcurrentHashMap2<>();
+    Map<String, String> map = new MyConcurrentHashMap<>();
     map.put("foo", "bar");
     map.clear();
     assertEquals(0, map.size());
@@ -63,7 +63,7 @@ public class MyConcurrentHashMap2Test {
 
   @Test
   public void sameHash() {
-    Map<DummyKey, Integer> map = new MyConcurrentHashMap2<>(3);
+    Map<DummyKey, Integer> map = new MyConcurrentHashMap<>(3);
     map.put(new DummyKey("foo-1"), 1);
     map.put(new DummyKey("foo-2"), 2);
     map.put(new DummyKey("bar-3"), 3);
@@ -77,7 +77,7 @@ public class MyConcurrentHashMap2Test {
 
   @Test
   public void randomTest() {
-    var myMap = new MyConcurrentHashMap2<>(10);
+    var myMap = new MyConcurrentHashMap<>(10);
     int maxIter = 100_000;
     Set<Map.Entry<String, Integer>> entries = new HashSet<>();
     for (int i = 1; i <= maxIter; ++i) {
