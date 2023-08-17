@@ -10,6 +10,7 @@
   <modules>
     <module>exercises</module>
     <module>benchmark</module>
+    <module>streams</module>
   </modules>
 
   <properties>
@@ -32,6 +33,8 @@
     <java.tuples.version>1.2</java.tuples.version>
     <spotless.plugin>2.36.0</spotless.plugin>
     <google.java.formatter>1.17.0</google.java.formatter>
+    <reactive-streams.version>1.0.4</reactive-streams.version>
+    <rxjava.version>3.1.6</rxjava.version>
   </properties>
 
   <build>
@@ -144,6 +147,11 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
+        <groupId>org.reactivestreams</groupId>
+        <artifactId>reactive-streams</artifactId>
+        <version>${reactive-streams.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.scala-lang</groupId>
         <artifactId>scala-library</artifactId>
         <version>${scala.version}</version>
@@ -195,6 +203,12 @@
         <version>${java.tuples.version}</version>
       </dependency>
       <!-- Test -->
+      <dependency>
+        <groupId>io.reactivex.rxjava3</groupId>
+        <artifactId>rxjava</artifactId>
+        <version>${rxjava.version}</version>
+        <scope>test</scope>
+      </dependency>
       <dependency>
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter-engine</artifactId>
