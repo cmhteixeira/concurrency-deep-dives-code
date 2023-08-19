@@ -1,17 +1,17 @@
 package com.cmhteixeira.streams.tck;
 
-import com.cmhteixeira.streams.ops.CmhPublisher;
+import com.cmhteixeira.streams.publishers.CmhPublisher;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.tck.PublisherVerification;
 import org.reactivestreams.tck.TestEnvironment;
 
-public class RangePublisherTest extends PublisherVerification<Integer> {
+public class FromListPublisherTest extends PublisherVerification<Integer> {
 
   int numElems = 10_000;
 
-  public RangePublisherTest() {
+  public FromListPublisherTest() {
     super(new TestEnvironment());
   }
 

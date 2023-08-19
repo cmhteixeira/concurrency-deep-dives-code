@@ -1,4 +1,4 @@
-package com.cmhteixeira.streams.ops;
+package com.cmhteixeira.streams.publishers;
 
 import org.reactivestreams.Subscription;
 

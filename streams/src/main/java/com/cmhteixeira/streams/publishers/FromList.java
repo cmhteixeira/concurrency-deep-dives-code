@@ -1,4 +1,4 @@
-package com.cmhteixeira.streams.ops;
+package com.cmhteixeira.streams.publishers;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,29 +27,26 @@ class FromList<T> extends CmhPublisher<T> {
   }
 
   class FromIterableSubscription implements Subscription {
-    Subscriber<T> subscriber;
+    Subscriber<T> s;
     int signalled = 0;
     int demandUnsign = 0;
 
     FromIterableSubscription(Subscriber<T> subscriber) {
-      this.subscriber = subscriber;
+      this.s = subscriber;
     }
 
     @Override
     public void request(long l) {
-      if (!subscribers.contains(subscriber)) return;
+      if (!subscribers.contains(s)) return;
       if (l <= 0) {
-        subscriber.onError(
-            new IllegalArgumentException(
-                "Non positive request signals are illegal. Requested: " + l));
+        s.onError(new IllegalArgumentException("Non positive request signals are illegal: " + l));
         return;
       }
       if (signalled == listSource.size()) return;
       int castedL = (int) Math.min(l, listSource.size());
       if (demandUnsign == 0) {
         demandUnsign = demandUnsign + castedL;
-        long upTo = signalled + castedL;
-        signal(upTo);
+        signal(signalled + castedL);
       } else {
         demandUnsign = demandUnsign + castedL;
       }
@@ -61,15 +58,15 @@ class FromList<T> extends CmhPublisher<T> {
         try {
           elem = listSource.get((int) i);
         } catch (IndexOutOfBoundsException e) {
-          subscriber.onComplete();
+          s.onComplete();
           return;
         }
-        subscriber.onNext(elem);
+        s.onNext(elem);
         ++signalled;
         --demandUnsign;
       }
       if (signalled == listSource.size()) {
-        subscriber.onComplete();
+        s.onComplete();
         return;
       }
       if (demandUnsign > 0) signal(signalled + demandUnsign);
@@ -77,7 +74,7 @@ class FromList<T> extends CmhPublisher<T> {
 
     @Override
     public void cancel() {
-      subscribers.remove(subscriber);
+      subscribers.remove(s);
     }
   }
 }
