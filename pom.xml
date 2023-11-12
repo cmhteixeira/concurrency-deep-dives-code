@@ -38,6 +38,7 @@
     <rxjava.version>3.1.6</rxjava.version>
     <reactive-streams.tck.version>1.0.4</reactive-streams.tck.version>
     <akka-streams.version>2.8.4</akka-streams.version>
+    <decline.version>2.4.1</decline.version>
   </properties>
 
   <build>
@@ -163,6 +164,16 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>org.typelevel</groupId>
+        <artifactId>cats-core_2.13</artifactId>
+        <version>2.9.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.monovore</groupId>
+        <artifactId>decline_2.13</artifactId>
+        <version>${decline.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.typesafe.akka</groupId>
         <artifactId>akka-stream_2.13</artifactId>

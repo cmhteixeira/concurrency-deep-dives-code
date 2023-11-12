@@ -8,13 +8,9 @@ import io.reactivex.rxjava3.core.Flowable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
-import io.reactivex.rxjava3.core.Scheduler;
-import io.reactivex.rxjava3.internal.schedulers.ExecutorScheduler;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -112,9 +108,9 @@ public class ValidationTests {
     System.out.println("Current thread: " + Thread.currentThread().getName());
     int numElems = 1000;
     CountSubscriber<Integer> subs = new CountSubscriber<>();
-//    Flowable.fromPublisher(CmhPublisher.range(0, numElems))
-//      CmhPublisher.range(0, numElems)
-      new RangePublisher(0, numElems)
+    //    Flowable.fromPublisher(CmhPublisher.range(0, numElems))
+    //      CmhPublisher.range(0, numElems)
+    new RangePublisher(0, numElems)
         //    Flowable.range(0, numElems)
         //        .observeOn(new ExecutorScheduler(Executors.newFixedThreadPool(2), false, false))
         //        .subscribeOn(new ExecutorScheduler(Executors.newFixedThreadPool(2), false, false))

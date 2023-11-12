@@ -1,9 +1,8 @@
 package com.cmhteixeira.streams.publishers;
 
+import java.util.UUID;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
-import java.util.UUID;
 
 class Range extends CmhPublisher<Integer> {
 

@@ -1,11 +1,9 @@
 package com.cmhteixeira.streams.subscribers;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class CountSubscriber<T> implements Subscriber<T> {
   private volatile Subscription s;
@@ -33,7 +31,7 @@ public class CountSubscriber<T> implements Subscriber<T> {
     if (t == null) throw null;
     System.out.printf("A-OnNext: %s\n", t);
     ++counter;
-//    s.request(4);
+    //    s.request(4);
     System.out.printf("B-OnNext: %s\n", t);
   }
 
