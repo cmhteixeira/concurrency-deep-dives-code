@@ -5,7 +5,7 @@
     <artifactId>concurrency-exercices</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>exercises</artifactId>
+  <artifactId>file-io</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <name>${project.artifactId}</name>
   <inceptionYear>2018</inceptionYear>
@@ -22,45 +22,7 @@
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
     </dependency>
-    <dependency>
-      <groupId>io.circe</groupId>
-      <artifactId>circe-core_${scala.compat.version}</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.circe</groupId>
-      <artifactId>circe-parser_${scala.compat.version}</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-    </dependency>
-    <dependency> <!--TODO: Only to print hex-string representation of sha-1 output. Consider another way-->
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.scodec</groupId>
-      <artifactId>scodec-bits_${scala.compat.version}</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.typesafe.akka</groupId>
-      <artifactId>akka-actor_${scala.compat.version}</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.javatuples</groupId>
-      <artifactId>javatuples</artifactId>
-    </dependency>
 
-    <!-- Test -->
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.scalatest</groupId>
       <artifactId>scalatest_${scala.compat.version}</artifactId>
@@ -69,8 +31,6 @@
   </dependencies>
 
   <build>
-<!--    <sourceDirectory>src/main/scala</sourceDirectory>-->
-<!--    <testSourceDirectory>src/test/scala</testSourceDirectory>-->
     <plugins>
 
       <plugin>
@@ -100,12 +60,6 @@
               <target>17</target>
               <compilerArgs>--enable-preview</compilerArgs>
           </configuration>
-          <!--        <executions>-->
-<!--          <execution>-->
-<!--            <id>default-compile</id>-->
-<!--            <phase>none</phase>-->
-<!--          </execution>-->
-<!--        </executions>-->
 
       </plugin>
       <plugin>

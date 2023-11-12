@@ -11,6 +11,7 @@
     <module>exercises</module>
     <module>benchmark</module>
     <module>streams</module>
+    <module>file-io</module>
   </modules>
 
   <properties>
