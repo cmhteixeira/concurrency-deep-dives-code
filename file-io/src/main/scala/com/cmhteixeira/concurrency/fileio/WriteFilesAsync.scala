@@ -1,22 +1,33 @@
 package com.cmhteixeira.concurrency.fileio
 
 import cats.implicits.toTraverseOps
+import com.cmhteixeira.concurrency.fileio.Config.OSMode
 import com.sun.nio.file.ExtendedOpenOption
 import org.slf4j.LoggerFactory
 
 import java.nio.ByteBuffer
 import java.nio.channels.{AsynchronousFileChannel, CompletionHandler}
-import java.nio.file.StandardOpenOption
-import java.util.concurrent.atomic.AtomicInteger
+import java.nio.file.{OpenOption, StandardOpenOption}
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Promise
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Promise}
 import scala.jdk.CollectionConverters.SetHasAsJava
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
-object WriteFiles {
-  val log = LoggerFactory.getLogger("WriteFiles")
-  def run(config: Config): Unit = {
-    val Config(dirs, numFiles, sizeFilesBytes, userControlStart, numThreads, queueMaxElem, captureExStats) = config
+object WriteFilesAsync {
+  private val log = LoggerFactory.getLogger("WriteFiles")
+  def run(config: Config.AsyncConfig): Try[Unit] = {
+    val Config.AsyncConfig(
+      dirs,
+      numFiles,
+      sizeFilesBytes,
+      userControlStart,
+      numThreads,
+      queueMaxElem,
+      captureExStats,
+      osMode
+    ) =
+      config
     log.info(s"Starting: $config")
     if (userControlStart) {
       println("Waiting for input to proceed ...")
@@ -28,6 +39,9 @@ object WriteFiles {
     val ec = ExecutorBuilder.createExecutor(numThreads, queueMaxElem)
     val trackingEc = if (captureExStats) ExecutorBuilder.trackingExecutionTime(ec) else ec
 
+    val openOptions: Set[OpenOption] =
+      Set(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE)
+
     val fileChannels = (1 to numFiles)
       .map { idx =>
         dirs.toList(idx % dirs.size).resolve(s"$idx.TXT")
@@ -37,12 +51,11 @@ object WriteFiles {
         AsynchronousFileChannel
           .open(
             o,
-            Set(
-              ExtendedOpenOption.DIRECT,
-              StandardOpenOption.WRITE,
-              StandardOpenOption.TRUNCATE_EXISTING,
-              StandardOpenOption.CREATE
-            ).asJava,
+            (osMode match {
+              case Some(OSMode.DirectIO) => openOptions + ExtendedOpenOption.DIRECT
+              case Some(OSMode.SyncIO) => openOptions + StandardOpenOption.SYNC
+              case None => openOptions
+            }).asJava,
             trackingEc
           )
       }
@@ -68,7 +81,7 @@ object WriteFiles {
     }
     log.info(s"Finished submitting all files:  ${(System.nanoTime() - afterOpening) * 1L / (1_000_000_000)} s")
 
-    submitted.sequence
+    val res = submitted.sequence
       .andThen {
         case Failure(exception) => log.info("TODO", exception)
         case Success(_) =>
@@ -87,21 +100,14 @@ object WriteFiles {
             case _ => log.info("Finished ...")
           }
       }
-      .onComplete { _ =>
+      .andThen { _ =>
         log.info("Shutting down ....")
         trackingEc.shutdownNow()
+        fileChannels.zipWithIndex.foreach { case (fC, i) =>
+          fC.close()
+          log.info(s"Closed file channel - $i")
+        }
       }
-
-    Runtime.getRuntime.addShutdownHook {
-      val threadsClosed = new AtomicInteger(0)
-      new Thread(
-        () =>
-          fileChannels.foreach { fC =>
-            fC.close()
-            log.info(s"Closed file channel - ${threadsClosed.incrementAndGet()}")
-          },
-        "shutdown-thread"
-      )
-    }
+    Try(Await.result(res, Duration.Inf))
   }
 }

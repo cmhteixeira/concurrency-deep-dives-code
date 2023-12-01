@@ -57,7 +57,7 @@
               <archive>
                 <manifest>
                   <mainClass>
-                    com.cmhteixeira.concurrency.fileio.WriteFilesApp
+                    com.cmhteixeira.concurrency.fileio.Cli
                   </mainClass>
                 </manifest>
               </archive>
