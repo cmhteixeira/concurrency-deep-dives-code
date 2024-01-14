@@ -12,13 +12,14 @@
     <module>benchmark</module>
     <module>streams</module>
     <module>file-io</module>
+    <module>blocking-sockets</module>
   </modules>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <encoding>UTF-8</encoding>
     <!--    todo: seems ot be correct one.-->
-    <scala.version>2.13.10</scala.version>
+    <scala.version>2.13.11</scala.version>
     <scala.compat.version>2.13</scala.compat.version>
     <spec2.version>4.2.0</spec2.version>
     <scala.test.version>3.2.15</scala.test.version>
@@ -37,6 +38,7 @@
     <reactive-streams.tck.version>1.0.4</reactive-streams.tck.version>
     <akka-streams.version>2.8.4</akka-streams.version>
     <decline.version>2.4.1</decline.version>
+    <picocli.version>4.7.5</picocli.version>
   </properties>
 
   <build>
@@ -158,6 +160,11 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>info.picocli</groupId>
+        <artifactId>picocli</artifactId>
+        <version>${picocli.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.typelevel</groupId>
         <artifactId>cats-core_2.13</artifactId>
