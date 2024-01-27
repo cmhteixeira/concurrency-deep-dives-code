@@ -52,6 +52,8 @@ public class HttpProxyApp implements Callable<Integer> {
 
   private Logger LOG = LoggerFactory.getLogger(getClass());
 
+  private ApplicationState state = new ApplicationState();
+
   @Override
   public Integer call() throws Exception {
     ServerSocket serverSocket = new ServerSocket();
@@ -65,7 +67,8 @@ public class HttpProxyApp implements Callable<Integer> {
           socket.getPort());
       Thread thread =
           new Thread(
-              new Connection(socket), String.format("socket-%s", socket.getLocalSocketAddress()));
+              new ClientConnection(socket, state),
+              String.format("socket-%s", socket.getLocalSocketAddress()));
       thread.start();
     }
   }

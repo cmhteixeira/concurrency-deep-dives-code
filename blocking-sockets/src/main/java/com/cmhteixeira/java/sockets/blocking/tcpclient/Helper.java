@@ -27,4 +27,14 @@ public class Helper {
       throw new IllegalArgumentException("Not valid: " + value);
     }
   }
+
+  private static final Pattern regex2 = Pattern.compile("^\\+([1-9][0-9]*)$");
+
+  public static int bytesToRead2(String input) {
+    Matcher matcher = regex2.matcher(input);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException("Wrong input: " + input);
+    }
+    return Integer.parseInt(matcher.group(1));
+  }
 }

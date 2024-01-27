@@ -10,20 +10,33 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Connection implements Runnable {
+public class ClientConnection implements Runnable {
 
   private Logger LOG = LoggerFactory.getLogger(getClass());
   private Socket clientSocket;
+  private ApplicationState state;
 
-  public Connection(Socket clientSocket) {
+  private final Configuration conf;
+
+  public ClientConnection(Socket clientSocket, ApplicationState state, Configuration conf) {
     this.clientSocket = clientSocket;
+    this.state = state;
+    this.conf = conf;
+  }
+
+  public ClientConnection(Socket clientSocket, ApplicationState state) {
+    this.clientSocket = clientSocket;
+    this.state = state;
+    this.conf = new Configuration(1024);
   }
 
   private InetSocketAddress tunnelDestination(String authorityRequestTarget) {
@@ -51,8 +64,18 @@ public class Connection implements Runnable {
     switch (requestLine.verb()) {
       case HttpVerb.CONNECT c -> {
         LOG.info("Received a CONNECT HTTP message: '{}'. Headers: {}", requestLine, headerString);
-        foo(tunnelDestination(requestLine.path()));
+        process(tunnelDestination(requestLine.path()));
       }
+      case HttpVerb.GET get -> {
+        if (requestLine.path().equals("stats")) {
+          LOG.info("Giving stats ...");
+          out.write(state.statsPerTunnelDomainShow().getBytes(StandardCharsets.UTF_8));
+        } else {
+          LOG.info("Not a CONNECT HTTP message: '{}'. Headers: {}", requestLine, headerString);
+          clientSocket.close();
+        }
+      }
+
       default -> {
         LOG.info("Not a CONNECT HTTP message: '{}'. Headers: {}", requestLine, headerString);
         clientSocket.close();
@@ -60,58 +83,74 @@ public class Connection implements Runnable {
     }
   }
 
-  private void foo(InetSocketAddress tunnelDestination) throws IOException {
-    //    if (!tunnelDestination.getHostName().contains("twitter.com")) {
-    //      clientSocket.close();
-    //      LOG.info("Not a request to twitter.com: {}", tunnelDestination.getHostName());
-    //      return;
-    //    }
+  private void process(InetSocketAddress tunnelDestination) throws IOException {
+    com.cmhteixeira.java.sockets.blocking.httpproxy.Proxy proxy =
+        new com.cmhteixeira.java.sockets.blocking.httpproxy.Proxy(
+            (InetSocketAddress) clientSocket.getRemoteSocketAddress(),
+            tunnelDestination,
+            UUID.randomUUID().toString());
+
+    state.clientConnected(proxy, System.currentTimeMillis());
+
     Socket tunnelSocket = new Socket();
-    tunnelSocket.connect(tunnelDestination);
+    try {
+      tunnelSocket.connect(tunnelDestination);
+    } catch (Exception e) {
+      LOG.info("Could not connect to tunnel.", e);
+      state.closeProxy(
+          proxy, System.currentTimeMillis(), new ProxyState.Closed.Reason.CouldNotConnectTunnel());
+    }
+
+    state.tunnelConnected(proxy);
 
     clientSocket
         .getOutputStream()
         .write(new ConnectResponse(200, "Connection Established").toBytes());
-    new Outbound(tunnelSocket).start();
+    new Proxy(tunnelSocket, proxy).start();
 
-    byte[] buffer = new byte[1024];
+    byte[] buffer = new byte[conf.bufferSize];
     while (true) {
       int bytesRead = tunnelSocket.getInputStream().read(buffer);
       if (bytesRead == -1) {
-        LOG.info(
-            "End of stream reading from tunnel destination {}",
-            tunnelSocket.getRemoteSocketAddress());
+        LOG.info("End of stream reading from tunnel destination for {}", proxy);
         clientSocket.close();
         tunnelSocket.close();
-        break;
+        state.closeProxy(proxy, System.currentTimeMillis(), new ProxyState.Closed.Reason.Tunnel());
+        return;
       }
-      LOG.info("Read {} bytes from tunnel {}", bytesRead, tunnelSocket.getInetAddress());
+      LOG.debug("Read {} bytes from tunnel {}", bytesRead, tunnelSocket.getInetAddress());
       clientSocket.getOutputStream().write(buffer, 0, bytesRead);
-      LOG.info("Sent bytes to client destination {}", clientSocket.getInetAddress());
+      state.bytesIntoClient(proxy, bytesRead);
+      LOG.debug("Sent bytes to client destination {}", clientSocket.getInetAddress());
     }
   }
 
-  private class Outbound extends Thread {
+  private class Proxy extends Thread {
 
     Socket tunnelSocket;
+    com.cmhteixeira.java.sockets.blocking.httpproxy.Proxy proxy;
 
-    Outbound(Socket tunnelSocket) {
+    Proxy(Socket tunnelSocket, com.cmhteixeira.java.sockets.blocking.httpproxy.Proxy proxy) {
       this.tunnelSocket = tunnelSocket;
+      this.proxy = proxy;
     }
 
     public void runInternal() throws IOException {
-      byte[] buffer = new byte[1024];
+      byte[] buffer = new byte[conf.bufferSize];
       while (true) {
         int bytesRead = clientSocket.getInputStream().read(buffer);
         if (bytesRead == -1) {
-          LOG.info("End of stream reading from client {}", clientSocket.getRemoteSocketAddress());
+          LOG.info("End of stream from client {}", proxy);
           clientSocket.close();
           tunnelSocket.close();
-          break;
+          state.closeProxy(
+              proxy, System.currentTimeMillis(), new ProxyState.Closed.Reason.Client());
+          return;
         }
-        LOG.info("Read {} bytes from client {}", bytesRead, clientSocket.getInetAddress());
+        LOG.debug("Read {} bytes from client {}", bytesRead, clientSocket.getInetAddress());
         tunnelSocket.getOutputStream().write(buffer, 0, bytesRead);
-        LOG.info("Sent bytes to tunnel destination {}", tunnelSocket.getInetAddress());
+        state.bytesIntoTunnel(proxy, bytesRead);
+        LOG.debug("Sent bytes to tunnel destination {}", tunnelSocket.getInetAddress());
       }
     }
 
@@ -120,17 +159,19 @@ public class Connection implements Runnable {
       try {
         runInternal();
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        LOG.info("Finished {}.", proxy);
       }
     }
   }
+
+  public record Configuration(int bufferSize) {}
 
   @Override
   public void run() {
     try {
       runInternal();
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      LOG.info("Finished {}.", clientSocket.getRemoteSocketAddress());
     }
   }
 }

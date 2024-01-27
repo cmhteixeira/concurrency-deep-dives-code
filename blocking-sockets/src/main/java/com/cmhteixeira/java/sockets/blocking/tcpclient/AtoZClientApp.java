@@ -5,14 +5,13 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.Scanner;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "TcpClient")
-class TcpClientApp implements Callable<Integer> {
+@CommandLine.Command(name = "A to Z TCP client app")
+class AtoZClientApp implements Callable<Integer> {
 
   @CommandLine.Option(names = "--local-address", description = "Local internet address to use.")
   private InetAddress localAddress;
@@ -39,8 +38,15 @@ class TcpClientApp implements Callable<Integer> {
   private int sendBufferSize;
 
   @CommandLine.Option(
+      names = {"--buffer-size-receive"},
+      defaultValue = "10",
+      converter = BufferSizeConverter.class,
+      description = "Receive buffer size in bytes. SendQ")
+  private int receiveBufferSize;
+
+  @CommandLine.Option(
       names = "--interval",
-      defaultValue = "1000",
+      defaultValue = "100",
       description = "Interval to sleep for in millis.")
   private int sleepInterval;
 
@@ -62,17 +68,22 @@ class TcpClientApp implements Callable<Integer> {
     Socket socket = new Socket();
     socket.bind(new InetSocketAddress(localAddress, localPort));
     socket.setSendBufferSize(sendBufferSize);
+    socket.setReceiveBufferSize(receiveBufferSize);
     socket.connect(new InetSocketAddress(remoteAddress, remotePort));
     System.out.println("Connected. SendBuffer=" + socket.getSendBufferSize());
+    System.out.println("Connected. ReceiveBuffer=" + socket.getSendBufferSize());
 
     OutputStreamWriter out =
         new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8);
 
     new Thread(
             () -> {
-              Scanner controlStream = new Scanner(System.in);
               while (true) {
-                controlStream.nextLine();
+                try {
+                  System.in.read();
+                } catch (IOException e) {
+                  System.exit(-1);
+                }
                 if (halt) {
                   System.out.println("Continuing ...");
                   halt = false;
@@ -93,8 +104,9 @@ class TcpClientApp implements Callable<Integer> {
     for (int i = 0; ; ++i) {
       if (!halt) {
         char charIteration = f[i % f.length];
-        String toSend = String.valueOf(charIteration).repeat(70);
+        String toSend = String.valueOf(charIteration).repeat(35);
         System.out.print("Sending: " + toSend);
+
         out.write(toSend + "\n");
         out.flush();
         System.out.println("   ✅");
@@ -104,7 +116,7 @@ class TcpClientApp implements Callable<Integer> {
   }
 
   public static void main(String[] args) {
-    int exitCode = new CommandLine(new TcpClientApp()).execute(args);
+    int exitCode = new CommandLine(new AtoZClientApp()).execute(args);
     System.exit(exitCode);
   }
 }

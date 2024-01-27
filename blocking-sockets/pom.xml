@@ -44,7 +44,7 @@
                             <archive>
                                 <manifest>
                                     <mainClass>
-                                        com.cmhteixeira.java.sockets.blocking.tcpclient.EchoServerAppSimplified
+                                        com.cmhteixeira.java.sockets.blocking.tcpclient.PrintStdoutTcpApp
                                     </mainClass>
                                 </manifest>
                             </archive>
@@ -65,7 +65,7 @@
                             <archive>
                                 <manifest>
                                     <mainClass>
-                                        com.cmhteixeira.java.sockets.blocking.tcpclient.TcpClientApp
+                                        com.cmhteixeira.java.sockets.blocking.tcpclient.AtoZClientApp
                                     </mainClass>
                                 </manifest>
                             </archive>
