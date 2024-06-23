@@ -13,6 +13,7 @@
     <module>streams</module>
     <module>file-io</module>
     <module>blocking-sockets</module>
+      <module>website</module>
   </modules>
 
   <properties>
