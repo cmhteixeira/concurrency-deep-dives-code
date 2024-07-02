@@ -1,15 +1,13 @@
-package schedulers;
+package schedulers.executorservice;
 
-import java.util.TimerTask;
-
-public class BackupDB2 extends TimerTask {
+public class MyTask implements Runnable {
 
   private final long startReference;
   private final int sleepFor;
 
   private final String taskName;
 
-  public BackupDB2(int sleepFor, String taskName) {
+  public MyTask(int sleepFor, String taskName) {
     this.startReference = System.currentTimeMillis();
     this.sleepFor = sleepFor;
     this.taskName = taskName;

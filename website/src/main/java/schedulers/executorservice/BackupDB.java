@@ -1,7 +1,7 @@
-package schedulers;
+package schedulers.executorservice;
 
-import java.util.TimerTask;
-public class BackupDB extends TimerTask {
+
+public class BackupDB implements Runnable {
 
   @Override
   public void run() {
