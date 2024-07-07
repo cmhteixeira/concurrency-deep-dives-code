@@ -5,13 +5,13 @@ import java.util.TimerTask;
 
 public class TimerRunner {
   public static void main(String[] args) throws InterruptedException {
-  Timer timer = new Timer("concurrency-deep-dives-timer-thread");
+    Timer timer = new Timer("concurrency-deep-dives-timer-thread");
 
-  TimerTask taskA = new QuickTask("A");
-  TimerTask longTask = new BackupDB2(13, "B");
+    TimerTask taskA = new QuickTask("A");
+    TimerTask longTask = new BackupDB2(13, "B");
 
-  timer.schedule(longTask, 3_000L);
-  timer.scheduleAtFixedRate(taskA, 0L, 5_000L);
+    timer.schedule(longTask, 3_000L);
+    timer.scheduleAtFixedRate(taskA, 0L, 5_000L);
   }
 }
 

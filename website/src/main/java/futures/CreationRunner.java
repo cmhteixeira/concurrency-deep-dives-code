@@ -50,6 +50,5 @@ public class CreationRunner {
 
     String result = cF3.get();
     System.out.printf("Completed from outside: %s. Result: %s", wasCompleted, result);
-
   }
 }

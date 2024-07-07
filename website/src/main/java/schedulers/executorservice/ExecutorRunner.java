@@ -2,18 +2,16 @@ package schedulers.executorservice;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.nio.file.Path;
-import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Executors;
 
 public class ExecutorRunner {
   public static void main(String[] args)
       throws ExecutionException, InterruptedException, IOException {
-//    ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    //    ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(8);
 
     Socket remoteConnection = new Socket("localhost", 8080);

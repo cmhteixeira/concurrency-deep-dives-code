@@ -1,14 +1,17 @@
 package futures;
 
-import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
-import org.apache.commons.io.monitor.FileAlterationMonitor;
-import org.apache.commons.io.monitor.FileAlterationObserver;
-
 import java.io.File;
 import java.util.concurrent.CompletableFuture;
+import org.apache.commons.io.monitor.*;
 
 public class FutureBridge {
 
+  /**
+   * Notification when file `password.txt` is created inside {@code dir}.
+   *
+   * @param dir File system directory we want to monitor.
+   * @return Future that completes when (and if) a file is created within {@code dir}.
+   */
   private static CompletableFuture<Void> passwordCreated(File dir) {
     CompletableFuture<Void> passwordFileExists = new CompletableFuture<>();
 
