@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
-public class Example {
+public class ChainingExample {
 
   private static final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -59,8 +59,8 @@ public class Example {
     return cF;
   }
 
-  private static int countPrefix(String contents) {
-    return (int) Pattern.compile("money").matcher(contents).results().count();
+  private static int countPrefix(String prefix, String contents) {
+    return (int) Pattern.compile(prefix).matcher(contents).results().count();
   }
 
   public static void main(String[] args) {
@@ -79,12 +79,11 @@ public class Example {
                 })
             .whenCompleteAsync(
                 (contents, exception) -> {
-                  if (exception == null)
-                    System.out.printf("Debug. Contents received: [%s]\n", contents);
+                  if (exception == null) System.out.printf("Received: [%s]\n", contents);
                   else exception.printStackTrace();
                 })
-            .thenApplyAsync(siteContents -> countPrefix(siteContents))
-            .thenComposeAsync(nOccurrences -> writeFile(nOccurrences.toString()));
+            .thenApplyAsync(siteContents -> countPrefix("monday", siteContents))
+            .thenComposeAsync(count -> writeFile(count.toString()));
 
     res.join();
   }

@@ -13,6 +13,14 @@ public class Main {
 
     cF1.cancel(true);
 
+    CompletableFuture<String> cF40 = cF1.exceptionallyCompose(null);
+    CompletableFuture<String> cF41 = cF1.exceptionallyComposeAsync(null);
+    CompletableFuture<String> cF42 = cF1.exceptionallyComposeAsync(null, null);
+
+    CompletableFuture<String> cF37 = cF1.exceptionally(null);
+    CompletableFuture<String> cF38 = cF1.exceptionallyAsync(null);
+    CompletableFuture<String> cF39 = cF1.exceptionallyAsync(null);
+
     CompletableFuture<Void> cF2 = cF1.thenAccept(String::length);
     CompletableFuture<Void> cF3 = cF1.thenAcceptAsync(String::length);
     CompletableFuture<Void> cF4 = cF1.thenAcceptAsync(String::length, null);
@@ -36,10 +44,6 @@ public class Main {
     CompletableFuture<Integer> cF17 = cF1.thenCompose(null);
     CompletableFuture<Integer> cF18 = cF1.thenComposeAsync(null);
     CompletableFuture<Integer> cF19 = cF1.thenComposeAsync(null, null);
-
-    //        CompletableFuture<Integer> cF20 = cF1.thenAcceptBoth(null, null);
-    //        CompletableFuture<Integer> cF21 = cF1.thenComposeAsync(null);
-    //        CompletableFuture<Integer> cF22 = cF1.thenComposeAsync(null, null);
 
     CompletableFuture<Integer> cF23 = cF1.thenCompose(null);
     CompletableFuture<Integer> cF24 = cF1.thenComposeAsync(null);
