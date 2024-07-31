@@ -64,28 +64,7 @@ public class Example {
   }
 
   public static void main(String[] args) {
-    StdInputMonitor stdInputMonitor = new StdInputMonitor();
-
-    CompletableFuture<Void> res =
-        stdInputMonitor
-            .monitor("url=")
-            .thenComposeAsync(url -> httpGetRequest(url))
-            .orTimeout(30, TimeUnit.SECONDS)
-            .exceptionallyComposeAsync(
-                exception -> {
-                  if (exception instanceof TimeoutException)
-                    return httpGetRequest("https://www.nytimes.com");
-                  else throw new CompletionException(exception);
-                })
-            .whenCompleteAsync(
-                (contents, exception) -> {
-                  if (exception == null)
-                    System.out.printf("Debug. Contents received: [%s]\n", contents);
-                  else exception.printStackTrace();
-                })
-            .thenApplyAsync(siteContents -> countPrefix(siteContents))
-            .thenComposeAsync(nOccurrences -> writeFile(nOccurrences.toString()));
-
-    res.join();
+    CompletableFuture<Path> cF1 = FileSystemMonitor.monitorFolder("*password*");
+    System.out.println(cF1.join());
   }
 }
