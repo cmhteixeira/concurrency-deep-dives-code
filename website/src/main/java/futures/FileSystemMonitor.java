@@ -1,52 +1,40 @@
 package futures;
 
-import org.apache.commons.io.filefilter.IOFileFilter;
-import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
-import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
-import org.apache.commons.io.monitor.FileAlterationMonitor;
-import org.apache.commons.io.monitor.FileAlterationObserver;
+import org.apache.commons.io.monitor.*;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
 public class FileSystemMonitor {
-  private static final FileAlterationMonitor fileMonitor = new FileAlterationMonitor();
 
-  static {
+  private FileSystemMonitor() {}
+
+  public static CompletableFuture<Path> monitorFolder(String dir, String pattern) {
     try {
-      fileMonitor.start();
+      return internal(dir, pattern);
     } catch (Exception e) {
-      throw new RuntimeException("Something went wrong starting the file monitor", e);
+      return CompletableFuture.failedFuture(e);
     }
   }
 
-  public static CompletableFuture<Path> monitorFolder(String pattern) {
+  private static CompletableFuture<Path> internal(String dir, String pattern) throws Exception {
     CompletableFuture<Path> cF1 = new CompletableFuture<>();
-    //    FileAlterationObserver fileObserver =
-    //        new FileAlterationObserver(
-    //            "/home/cmhteixeira/", WildcardFileFilter.builder().setWildcards(pattern).get());
-    FileAlterationObserver fileObserver =
-        new FileAlterationObserver("/home/cmhteixeira/", (new IOFileFilter() {
-            @Override
-            public boolean accept(File file) {
-                return false;
-            }
 
-            @Override
-            public boolean accept(File dir, String name) {
-                return false;
-            }
-        });
-    fileMonitor.addObserver(fileObserver);
-    fileObserver.addListener(
+    var monitor = new FileAlterationMonitor();
+    var observer = new FileAlterationObserver(dir, new WildcardFileFilter(pattern));
+
+    observer.addListener(
         new FileAlterationListenerAdaptor() {
           @Override
           public void onFileCreate(final File file) {
-            cF1.complete(file.toPath());
+            cF1.complete(file.toPath()); // the important part
           }
         });
+    monitor.addObserver(observer);
+    monitor.start();
+
     return cF1;
   }
 }

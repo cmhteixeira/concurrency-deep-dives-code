@@ -64,7 +64,7 @@ public class Example {
   }
 
   public static void main(String[] args) {
-    CompletableFuture<Path> cF1 = FileSystemMonitor.monitorFolder("*password*");
+    CompletableFuture<Path> cF1 = FileSystemMonitor.monitorFolder("/home/cmhteixeira/Desktop", "*password*");
     System.out.println(cF1.join());
   }
 }
