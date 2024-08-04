@@ -64,7 +64,26 @@ public class Example {
   }
 
   public static void main(String[] args) {
-    CompletableFuture<Path> cF1 = FileSystemMonitor.monitorFolder("/home/cmhteixeira/Desktop", "*password*");
-    System.out.println(cF1.join());
+    CompletableFuture<Void> cF1 =
+        CompletableFuture.runAsync(
+            () -> {
+              try {
+                // pretend this is a long-running or blocking computation
+                Thread.sleep(10_000L);
+              } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+              }
+
+              System.out.println("Finishing running computation ...");
+            });
+
+    CompletableFuture<Void> cF2 =
+        cF1.thenRunAsync(
+            () -> {
+              // Do something else
+            });
+
+    cF1.join();
+    System.out.println("This line will only run after the future cF1 completes ...");
   }
 }
