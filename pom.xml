@@ -242,6 +242,12 @@
         <artifactId>javatuples</artifactId>
         <version>${java.tuples.version}</version>
       </dependency>
+
+      <dependency>
+        <groupId>org.asynchttpclient</groupId>
+        <artifactId>async-http-client</artifactId>
+        <version>3.0.0</version>
+      </dependency>
       <!-- Test -->
       <dependency>
         <groupId>io.reactivex.rxjava3</groupId>

@@ -10,10 +10,7 @@ import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.CompletionHandler;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
 public class Example {
@@ -63,27 +60,71 @@ public class Example {
     return (int) Pattern.compile("money").matcher(contents).results().count();
   }
 
-  public static void main(String[] args) {
+  private static String readFile(Path path) {
+    return null;
+  }
+
+  private static String extractUserId(String rawString) {
+    return null;
+  }
+
+  private static CompletableFuture<UserProfile> fetchUserProfile(String rawString) {
+    return null;
+  }
+
+  private static void logAccessOnDB(Data accessData) {
+    return;
+  }
+
+  private static Data downloadRestrictedData(UserProfile user, UserPermissions permissions) {
+    return null;
+  }
+
+  record Data() {}
+
+  record UserProfile() {}
+
+  class InvalidUserId extends RuntimeException {}
+
+  static CompletableFuture<UserPermissions> fetchUserPermissions() {
+    return null;
+  }
+
+  record UserPermissions() {}
+
+  public static void main(String[] args) throws ExecutionException, InterruptedException {
+    FutureTask<String> fT =
+        new FutureTask<>(
+            () -> {
+              Thread.sleep(10_000L);
+              return "Concurrency Deep Dives";
+            });
+
+    ForkJoinPool.commonPool().submit(fT);
+
+    while (!fT.isDone()) {
+      System.out.println("Foo bar");
+    }
+
+    Path path = null;
+    UserProfile defaultProfile = null;
+
     CompletableFuture<Void> cF1 =
-        CompletableFuture.runAsync(
-            () -> {
-              try {
-                // pretend this is a long-running or blocking computation
-                Thread.sleep(10_000L);
-              } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-              }
+        CompletableFuture.supplyAsync(() -> readFile(path))
+            .thenApplyAsync(str -> extractUserId(str))
+            .thenCompose(userId -> fetchUserProfile(userId))
+            .exceptionally(
+                exception -> {
+                  if (exception instanceof InvalidUserId) return defaultProfile;
+                  else throw new CompletionException(exception);
+                })
+            .thenCombine(
+                fetchUserPermissions(),
+                (userProfile, allPermissions) ->
+                    downloadRestrictedData(userProfile, allPermissions))
+            .thenAcceptAsync(accessData -> logAccessOnDB(accessData));
 
-              System.out.println("Finishing running computation ...");
-            });
-
-    CompletableFuture<Void> cF2 =
-        cF1.thenRunAsync(
-            () -> {
-              // Do something else
-            });
-
-    cF1.join();
-    System.out.println("This line will only run after the future cF1 completes ...");
+    String res = fT.get();
+    System.out.println("The result was: " + res);
   }
 }
