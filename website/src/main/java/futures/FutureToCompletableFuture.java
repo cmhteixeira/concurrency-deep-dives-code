@@ -10,7 +10,7 @@ public class FutureToCompletableFuture {
 
   // this class uses only one thread and can handle tens of thousands of
   // the polling tasks we require
-  private static Timer timer = new Timer("future-to-completablefuture-thread", true);
+  private static Timer timer = new Timer("future-to-completablefuture-thread", false);
   private static long pollPeriodMillisDefault = 50L;
 
   static <T> CompletableFuture<T> poll(Future<T> original) {
@@ -56,7 +56,9 @@ public class FutureToCompletableFuture {
           try {
             T result = original.get();
             cF1.complete(result);
-          } catch (Throwable e) {
+          } catch (ExecutionException e) {
+            cF1.completeExceptionally(new CompletionException(e.getCause()));
+          } catch (CancellationException | InterruptedException e) {
             cF1.completeExceptionally(e);
           }
         });
@@ -64,15 +66,22 @@ public class FutureToCompletableFuture {
     return cF1;
   }
 
-  static <T> CompletableFuture<T> toCompletableFuture2(Future<T> original, Executor executor) {
+  static <T> CompletableFuture<T> toCompletableFutureViaSupply(
+      Future<T> original, Executor executor) {
     return CompletableFuture.supplyAsync(
         () -> {
           try {
             return original.get();
-          } catch (Throwable e) {
+          } catch (ExecutionException e) {
+            throw new CompletionException(e.getCause());
+          } catch (InterruptedException e) {
             throw new CompletionException(e);
           }
         },
         executor);
+  }
+
+  static <T> CompletableFuture<T> toCompletableFutureViaSupply(Future<T> original) {
+    return toCompletableFutureViaSupply(original, ForkJoinPool.commonPool());
   }
 }

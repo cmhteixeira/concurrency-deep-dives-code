@@ -10,8 +10,13 @@ import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.CompletionHandler;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public class Example {
 
@@ -38,6 +43,7 @@ public class Example {
     } catch (IOException e) {
       return CompletableFuture.failedFuture(e);
     }
+
     fC.write(
         ByteBuffer.wrap(content.getBytes()),
         0,
@@ -92,39 +98,45 @@ public class Example {
 
   record UserPermissions() {}
 
-  public static void main(String[] args) throws ExecutionException, InterruptedException {
-    FutureTask<String> fT =
-        new FutureTask<>(
-            () -> {
-              Thread.sleep(10_000L);
-              return "Concurrency Deep Dives";
-            });
-
-    ForkJoinPool.commonPool().submit(fT);
-
-    while (!fT.isDone()) {
-      System.out.println("Foo bar");
+  public static long generateRandomLong(long min, long max) {
+    if (min >= max) {
+      throw new IllegalArgumentException("max must be greater than min");
     }
+    Random random = new Random();
+    return min + (long) (random.nextDouble() * (max - min));
+  }
 
-    Path path = null;
-    UserProfile defaultProfile = null;
+  private static int lapsedS(long startReference) {
+    return (int) ((System.currentTimeMillis() - startReference) / 1000L);
+  }
 
-    CompletableFuture<Void> cF1 =
-        CompletableFuture.supplyAsync(() -> readFile(path))
-            .thenApplyAsync(str -> extractUserId(str))
-            .thenCompose(userId -> fetchUserProfile(userId))
-            .exceptionally(
-                exception -> {
-                  if (exception instanceof InvalidUserId) return defaultProfile;
-                  else throw new CompletionException(exception);
-                })
-            .thenCombine(
-                fetchUserPermissions(),
-                (userProfile, allPermissions) ->
-                    downloadRestrictedData(userProfile, allPermissions))
-            .thenAcceptAsync(accessData -> logAccessOnDB(accessData));
+  public static void main(String[] args) throws ExecutionException, InterruptedException {
+    Thread.sleep(10_000L);
 
-    String res = fT.get();
-    System.out.println("The result was: " + res);
+    List<Future<Integer>> foo =
+        IntStream.range(0, 10_000)
+            .boxed()
+            .map(
+                i ->
+                    (Future<Integer>)
+                        CompletableFuture.supplyAsync(
+                            () -> i,
+                            CompletableFuture.delayedExecutor(
+                                generateRandomLong(1_000, 30_000), TimeUnit.MILLISECONDS)))
+            .toList();
+
+    AtomicInteger counter = new AtomicInteger(0);
+    AtomicInteger errorCounter = new AtomicInteger(0);
+    for (Future<Integer> fut : foo) {
+      FutureToCompletableFuture.poll(fut)
+          .whenCompleteAsync(
+              (res, ex) -> {
+                if (ex != null)
+                  System.out.printf(
+                      "Erroed future. %s.%d\n",
+                      ex.getMessage().replace('\n', ' '), errorCounter.incrementAndGet());
+                else System.out.printf("Completed future %d. %d\n", res, counter.incrementAndGet());
+              });
+    }
   }
 }
