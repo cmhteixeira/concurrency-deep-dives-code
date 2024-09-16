@@ -1,24 +1,25 @@
 package futures.crawler;
 
+import java.net.URI;
 import java.util.function.Consumer;
 
 sealed interface LinkHops {
 
-  static LinkHops empty(String root) {
+  static LinkHops empty(URI root) {
     return new Root(root);
   }
 
-  default Hop add(String link) {
+  default Hop add(URI link) {
     return new Hop(link, this);
   }
 
-  String get();
+  URI get();
 
-  void forEach(Consumer<String> f);
+  void forEach(Consumer<URI> f);
 
   int size();
 
-  record Hop(String current, LinkHops parent) implements LinkHops {
+  record Hop(URI current, LinkHops parent) implements LinkHops {
     public String toString() {
       StringBuilder buffer = new StringBuilder();
       buffer.append("[");
@@ -35,12 +36,12 @@ sealed interface LinkHops {
     }
 
     @Override
-    public String get() {
+    public URI get() {
       return current;
     }
 
     @Override
-    public void forEach(Consumer<String> f) {
+    public void forEach(Consumer<URI> f) {
       f.accept(current);
       parent.forEach(f);
     }
@@ -51,18 +52,18 @@ sealed interface LinkHops {
     }
   }
 
-  record Root(String root) implements LinkHops {
+  record Root(URI root) implements LinkHops {
     public String toString() {
       return "[" + root + "]";
     }
 
     @Override
-    public String get() {
+    public URI get() {
       return root;
     }
 
     @Override
-    public void forEach(Consumer<String> f) {
+    public void forEach(Consumer<URI> f) {
       f.accept(root);
     }
 

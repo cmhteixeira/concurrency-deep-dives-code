@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 public class ReadWriteFile {
   private static void textFilter(Path in, Path out) {
