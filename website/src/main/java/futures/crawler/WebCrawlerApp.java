@@ -12,46 +12,25 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
+
+import org.asynchttpclient.uri.Uri;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import io.vavr.collection.List;
 
 public class WebCrawlerApp {
-  private static Executor executor = Executors.newWorkStealingPool(10);
-
   private final HttpClient httpClient =
       HttpClient.newBuilder()
           .version(HttpClient.Version.HTTP_1_1)
           .followRedirects(HttpClient.Redirect.NORMAL)
-          //          .executor(executor)
           .build();
 
-  private final Set<String> UnwantedExtensions =
-      Set.of(
-          ".jpg",
-          ".woff",
-          ".png",
-          ".svg",
-          ".woff2",
-          ".ttf",
-          ".js",
-          ".ico",
-          ".json",
-          ".jpeg",
-          ".xml",
-          ".zip",
-          ".tar.gz",
-          "tar.gz.sha256",
-          ".rpm",
-          ".deb",
-          ".exe",
-          ".msi",
-          ".mp4",
-          ".pdf",
-          ".git",
-          ".gif",
+  private final io.vavr.collection.Set<String> UNWANTED_EXTENSIONS =
+      io.vavr.collection.HashSet.of(
+          ".jpg", ".woff", ".png", ".svg", ".woff2", ".ttf", ".js", ".ico", ".json", ".jpeg",
+          ".xml", ".zip", ".tar.gz", ".rpm", ".deb", ".exe", ".msi", ".mp4", ".pdf", ".git", ".gif",
           ".dmg");
 
   private final int maxConcurrency;
@@ -61,7 +40,7 @@ public class WebCrawlerApp {
       new ConcurrentLinkedQueue<>();
   private final Set<URI> urlsSeen = Collections.newSetFromMap(new ConcurrentHashMap<>());
   private final FileOutputStream outputStream;
-  private final CompletableFuture<LinkHops> resGraph = new CompletableFuture<>();
+  private final CompletableFuture<List<URI>> resGraph = new CompletableFuture<>();
 
   public WebCrawlerApp(int maxConcurrency, String targetUrl) throws IOException {
     this(maxConcurrency, targetUrl, Path.of("./crawling-output.txt"));
@@ -73,23 +52,21 @@ public class WebCrawlerApp {
     this.outputStream = new FileOutputStream(out.toFile());
   }
 
-  private Set<String> extractLinks(String htmlDoc) {
+  private io.vavr.collection.Set<String> extractLinks(String htmlDoc) {
     Document doc = Jsoup.parse(htmlDoc);
     Elements elements = doc.select("a[href]");
     Set<String> links = new HashSet<>();
     for (Element link : elements) {
       links.add(link.attr("abs:href"));
     }
-    return Set.copyOf(links);
+    return io.vavr.collection.HashSet.ofAll(links);
   }
 
-  private Set<String> filterOutFiles(Set<String> urls) {
-    return urls.stream()
-        .filter(url -> UnwantedExtensions.stream().noneMatch(url::endsWith))
-        .collect(Collectors.toUnmodifiableSet());
+  private io.vavr.collection.Set<String> filterOutFiles(io.vavr.collection.Set<String> urls) {
+    return urls.filter(url -> !UNWANTED_EXTENSIONS.exists(url::endsWith));
   }
 
-  private CompletableFuture<Set<URI>> scrapeExternalLinks(URI url) {
+  private CompletableFuture<io.vavr.collection.Set<URI>> scrapeExternalLinks(URI url) {
     HttpRequest httpRequest;
 
     try {
@@ -104,28 +81,28 @@ public class WebCrawlerApp {
         .thenApplyAsync(maybeBody -> extractLinks(maybeBody.body()))
         .thenApplyAsync(this::filterOutFiles)
         .thenApplyAsync(this::removeFragmentsAndQueryString)
-        .exceptionally(ignored -> Set.of());
+        .exceptionally(ignored -> io.vavr.collection.HashSet.empty());
   }
 
-  private Set<URI> removeFragmentsAndQueryString(Set<String> strUris) {
-    Set<URI> uris = new HashSet<>(strUris.size());
-    for (String uriStr : strUris) {
-      try {
-        URI uri = URI.create(uriStr);
-        if (!Objects.equals(uri.getScheme(), "https")) break;
-        URI uriNoFragmentOrQueryString =
-            new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), null, null);
-        uris.add(uriNoFragmentOrQueryString);
-      } catch (Exception e) {
-        throw new CompletionException("Parsing uri: " + uriStr, e);
-      }
-    }
-    return Set.copyOf(uris);
+  private io.vavr.collection.Set<URI> removeFragmentsAndQueryString(
+      io.vavr.collection.Set<String> strUris) {
+
+    return strUris
+        .map(
+            uriStr -> {
+              try {
+                URI uri = URI.create(uriStr);
+                return new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), null, null);
+              } catch (Exception e) {
+                throw new CompletionException("Parsing uri: " + uriStr, e);
+              }
+            })
+        .filter(uri -> Objects.equals(uri.getScheme(), "https"));
   }
 
-  private Optional<LinkHops> foo(Set<LinkHops.Hop> hops) {
+  private Optional<List<URI>> foo(io.vavr.collection.Set<List<URI>> hops) {
     if (hops != null) {
-      for (LinkHops hop : hops) {
+      for (List<URI> hop : hops) {
         try {
           if (hop.get().getHost().contains(destination)) return Optional.of(hop);
         } catch (Exception e) {
@@ -168,53 +145,51 @@ public class WebCrawlerApp {
         .whenCompleteAsync((ignoredL, ignoredR) -> returnPermission());
   }
 
-  public CompletableFuture<LinkHops> crawl(URI startUrl) {
-    recursive(LinkHops.empty(startUrl));
-    return resGraph;
+  public CompletableFuture<List<URI>> crawl(URI startUrl) {
+    CompletableFuture<io.vavr.collection.Set<List<URI>>> cF = recursive(List.of(startUrl));
+    return resGraph.whenCompleteAsync(
+        (res, ex) -> {
+          if (res != null) {
+            String res2 = cF.join().map(k -> k.mkString(", ")).mkString("\n");
+            try {
+              this.outputStream.write(
+                  ("####################" + res2.length() + "\n").getBytes(StandardCharsets.UTF_8));
+              this.outputStream.write("####################\n".getBytes(StandardCharsets.UTF_8));
+              this.outputStream.write(res2.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }
+        });
   }
 
-  private CompletableFuture<Set<LinkHops>> recursive(LinkHops current) {
+  private CompletableFuture<io.vavr.collection.Set<List<URI>>> recursive(List<URI> current) {
     URI currentUri = current.get();
     if (resGraph.isDone()) {
-      return CompletableFuture.completedFuture(Set.of(current));
+      return CompletableFuture.completedFuture(io.vavr.collection.HashSet.of(current));
     }
 
     return getPermission(() -> scrapeExternalLinks(currentUri))
         .whenCompleteAsync((ignoredL, ignoredR) -> write(currentUri))
-        .exceptionally(ignore -> Set.of()) // address this.
+        .exceptionally(ignore -> io.vavr.collection.HashSet.empty()) // address this.
         .thenApplyAsync(
             childLinks ->
-                childLinks.stream()
+                childLinks
                     .filter(uri -> !uri.toString().isBlank())
-                    .filter(uri -> !urlsSeen.contains(uri))
-                    .collect(Collectors.toSet()))
+                    .filter(uri -> !urlsSeen.contains(uri)))
         .whenCompleteAsync(
             (childLinks, ignored) -> {
-              if (childLinks != null) urlsSeen.addAll(childLinks);
+              if (childLinks != null) childLinks.forEach(urlsSeen::add);
             })
-        .thenApplyAsync(
-            childLinks -> childLinks.stream().map(current::add).collect(Collectors.toSet()))
-        .whenCompleteAsync(
-            (hops, throwable) -> {
-              //              System.out.printf(
-              //                  "Current requests: %d. Queue size: %d\n",
-              //                  currentConcurrency.get(), queueFutures.size());
-              foo(hops).ifPresent(resGraph::complete);
-            })
+        .thenApplyAsync(childLinks -> childLinks.map(current::prepend))
+        .whenCompleteAsync((hops, throwable) -> foo(hops).ifPresent(resGraph::complete))
         .thenComposeAsync(
-            externalLink -> {
-              List<CompletableFuture<Set<LinkHops>>> children =
-                  externalLink.stream().map(this::recursive).toList();
+            externalLinks -> {
+              io.vavr.collection.Set<CompletableFuture<io.vavr.collection.Set<List<URI>>>>
+                  children = externalLinks.map(this::recursive);
 
-              return CompletableFuture.allOf(children.toArray(new CompletableFuture[0]))
-                  .thenApplyAsync(
-                      unused -> {
-                        Set<LinkHops> linkHops = new HashSet<>();
-                        for (CompletableFuture<Set<LinkHops>> child : children) {
-                          linkHops.addAll(child.join());
-                        }
-                        return Set.copyOf(linkHops);
-                      });
+              return CompletableFuture.allOf(children.toJavaArray(i -> new CompletableFuture[0]))
+                  .thenApplyAsync(unused -> children.flatMap(CompletableFuture::join));
             });
   }
 
@@ -224,9 +199,9 @@ public class WebCrawlerApp {
 
     String urlRoot = "https://www.dev.java";
 
-    CompletableFuture<LinkHops> linksCf = app.crawl(URI.create(urlRoot));
+    CompletableFuture<List<URI>> linksCf = app.crawl(URI.create(urlRoot));
 
-    LinkHops links = linksCf.join();
+    List<URI> links = linksCf.join();
     System.out.println("Done.");
     links.forEach(System.out::println);
   }
