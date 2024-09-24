@@ -12,7 +12,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
@@ -28,7 +27,7 @@ public class WebCrawlerApp {
           .build();
 
   private final Set<String> UNWANTED_EXTENSIONS =
-      io.vavr.collection.HashSet.of(
+      HashSet.of(
           ".jpg", ".woff", ".png", ".svg", ".woff2", ".ttf", ".js", ".ico", ".json", ".jpeg",
           ".xml", ".zip", ".tar.gz", ".rpm", ".deb", ".exe", ".msi", ".mp4", ".pdf", ".git", ".gif",
           ".dmg");
@@ -39,25 +38,17 @@ public class WebCrawlerApp {
   private final ConcurrentLinkedQueue<CompletableFuture<Void>> queueFutures =
       new ConcurrentLinkedQueue<>();
   private final java.util.Set<URI> urlsSeen = Collections.newSetFromMap(new ConcurrentHashMap<>());
-  private final FileOutputStream outputStream;
-  private final Path outputFolder;
   private final CompletableFuture<List<URI>> resGraph = new CompletableFuture<>();
 
-  public WebCrawlerApp(int maxConcurrency, String targetUrl) throws IOException {
-    this(maxConcurrency, targetUrl, Path.of("./crawling-output.txt"));
-  }
-
-  public WebCrawlerApp(int maxConcurrency, String targetUrl, Path out) throws IOException {
+  public WebCrawlerApp(int maxConcurrency, String targetUrl) {
     this.maxConcurrency = maxConcurrency;
     this.destination = targetUrl;
-    this.outputFolder = out;
-    this.outputStream = new FileOutputStream(out.resolve("debug-crawler.csv").toFile());
   }
 
   private Set<String> extractLinks(String htmlDoc) {
     Document doc = Jsoup.parse(htmlDoc);
     Elements elements = doc.select("a[href]");
-    return HashSet.ofAll(elements).map(k -> k.attr("abs:href"));
+    return HashSet.ofAll(elements).map(element -> element.attr("abs:href"));
   }
 
   private CompletableFuture<Set<URI>> scrapeExternalLinks(URI url) {
@@ -75,12 +66,11 @@ public class WebCrawlerApp {
         .thenApplyAsync(maybeBody -> extractLinks(maybeBody.body()))
         .thenApplyAsync(
             children -> children.filter(child -> !UNWANTED_EXTENSIONS.exists(child::endsWith)))
-        .thenApplyAsync(this::removeFragmentsAndQueryString)
+        .thenApplyAsync(this::parseURI)
         .exceptionally(ignored -> HashSet.empty());
   }
 
-  private Set<URI> removeFragmentsAndQueryString(Set<String> strUris) {
-
+  private Set<URI> parseURI(Set<String> strUris) {
     return strUris
         .map(
             uriStr -> {
@@ -93,15 +83,6 @@ public class WebCrawlerApp {
             })
         .filter(uri -> Objects.equals(uri.getScheme(), "https"))
         .filter(uri -> uri.getHost() != null && !uri.getHost().isBlank());
-  }
-
-  private void write(URI url) {
-    try {
-      this.outputStream.write(
-          String.format("%s, %s\n", url.getAuthority(), url).getBytes(StandardCharsets.UTF_8));
-    } catch (IOException exception) {
-      throw new CompletionException(String.format("Error writing url %s to file", url), exception);
-    }
   }
 
   private void returnPermission() {
@@ -130,12 +111,11 @@ public class WebCrawlerApp {
     CompletableFuture<Set<List<URI>>> cF = childLinks(List.of(startUrl));
     return resGraph.whenCompleteAsync(
         (res, ex) -> {
-          String res2 = cF.join().map(k -> k.mkString(", ")).mkString("\n");
-          try (FileOutputStream oS =
-              new FileOutputStream(outputFolder.resolve("crawl-paths.csv").toFile())) {
-            oS.write(res2.getBytes(StandardCharsets.UTF_8));
+          String allPathsVisited = cF.join().map(k -> k.mkString(", ")).mkString("\n");
+          try (FileOutputStream oS = new FileOutputStream(Path.of("crawl-paths.csv").toFile())) {
+            oS.write(allPathsVisited.getBytes(StandardCharsets.UTF_8));
           } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new CompletionException("Whilst writing all paths explored ...", e);
           }
         });
   }
@@ -143,12 +123,13 @@ public class WebCrawlerApp {
   private CompletableFuture<Set<List<URI>>> childLinks(List<URI> current) {
     URI currentUri = current.get();
     if (resGraph.isDone()) {
-      return CompletableFuture.completedFuture(io.vavr.collection.HashSet.of(current));
+      return CompletableFuture.completedFuture(HashSet.of(current));
     }
 
     return getPermission(() -> scrapeExternalLinks(currentUri))
-        .whenCompleteAsync((ignoredL, ignoredR) -> write(currentUri))
-        .exceptionally(ignore -> io.vavr.collection.HashSet.empty()) // address this.
+        .whenCompleteAsync(
+            (l, r) -> System.out.printf("%s, %s\n", currentUri.getAuthority(), currentUri))
+        .exceptionally(ignored -> HashSet.empty())
         .thenApplyAsync(
             childLinks ->
                 childLinks
@@ -162,7 +143,7 @@ public class WebCrawlerApp {
             (childUris, throwable) -> {
               if (childUris != null) {
                 childUris
-                    .find(child -> Objects.equals(child.getHost(), destination))
+                    .find(child -> child.getHost().contains(destination))
                     .toJavaOptional()
                     .ifPresent(destLink -> resGraph.complete(current.prepend(destLink)));
               }
@@ -177,15 +158,12 @@ public class WebCrawlerApp {
             });
   }
 
-  public static void main(String[] args) throws IOException {
-    WebCrawlerApp app = new WebCrawlerApp(300, "bbc.co.uk", Path.of("/home/cmhteixeira/Desktop"));
+  public static void main(String[] args) {
+    WebCrawlerApp app = new WebCrawlerApp(10, "superfastpython.com");
 
-    String urlRoot = "https://www.dev.java";
-
-    CompletableFuture<List<URI>> linksCf = app.crawl(URI.create(urlRoot));
-
-    List<URI> links = linksCf.join();
+    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://www.dev.java"));
+    List<URI> possiblePath = possiblePathF.join();
     System.out.println("Done:");
-    links.forEach(System.out::println);
+    possiblePath.forEach(System.out::println);
   }
 }
