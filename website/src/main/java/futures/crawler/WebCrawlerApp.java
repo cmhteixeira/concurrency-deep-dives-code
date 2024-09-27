@@ -8,6 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,18 +27,12 @@ public class WebCrawlerApp {
           .followRedirects(HttpClient.Redirect.NORMAL)
           .build();
 
-  private final Set<String> UNWANTED_EXTENSIONS =
-      HashSet.of(
-          ".jpg", ".woff", ".png", ".svg", ".woff2", ".ttf", ".js", ".ico", ".json", ".jpeg",
-          ".xml", ".zip", ".tar.gz", ".rpm", ".deb", ".exe", ".msi", ".mp4", ".pdf", ".git", ".gif",
-          ".dmg");
-
   private final int maxConcurrency;
   private final String destination;
   private final AtomicInteger currentConcurrency = new AtomicInteger(0);
   private final ConcurrentLinkedQueue<CompletableFuture<Void>> queueFutures =
       new ConcurrentLinkedQueue<>();
-  private final java.util.Set<URI> urlsSeen = Collections.newSetFromMap(new ConcurrentHashMap<>());
+  private final ConcurrentHashMap<String, Set<URI>> urlsSeen = new ConcurrentHashMap<>();
   private final CompletableFuture<List<URI>> resGraph = new CompletableFuture<>();
 
   public WebCrawlerApp(int maxConcurrency, String targetUrl) {
@@ -55,7 +50,7 @@ public class WebCrawlerApp {
     HttpRequest httpRequest;
 
     try {
-      httpRequest = HttpRequest.newBuilder(url).GET().build();
+      httpRequest = HttpRequest.newBuilder(url).GET().timeout(Duration.ofSeconds(1)).build();
     } catch (Exception e) {
       return CompletableFuture.failedFuture(e);
     }
@@ -63,7 +58,7 @@ public class WebCrawlerApp {
     long start = System.currentTimeMillis();
     return httpClient
         .sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
-        .orTimeout(5, TimeUnit.SECONDS)
+        //        .orTimeout(5, TimeUnit.SECONDS)
         .whenCompleteAsync(
             (httpResponse, exception) ->
                 System.out.printf(
@@ -73,8 +68,6 @@ public class WebCrawlerApp {
                     url.getAuthority(),
                     url))
         .thenApplyAsync(httpResponse -> extractLinks(httpResponse.body()))
-        .thenApplyAsync(
-            children -> children.filter(child -> !UNWANTED_EXTENSIONS.exists(child::endsWith)))
         .thenApplyAsync(this::parseURI)
         .exceptionally(ignored -> HashSet.empty());
   }
@@ -138,13 +131,35 @@ public class WebCrawlerApp {
     return getPermission(() -> scrapeExternalLinks(currentUri))
         .exceptionally(ignored -> HashSet.empty())
         .thenApplyAsync(
-            childLinks ->
-                childLinks
+            children ->
+                children.filter(child -> !child.getAuthority().equals(currentUri.getAuthority())))
+        .thenApplyAsync(
+            children ->
+                children.filter(
+                    child -> child.getPath().endsWith(".html") || !child.getPath().contains(".")))
+        .thenApplyAsync(
+            children ->
+                children
                     .filter(uri -> !uri.toString().isBlank())
-                    .filter(uri -> !urlsSeen.contains(uri)))
+                    .filter(
+                        uri -> {
+                          String authority = uri.getAuthority();
+                          Set<URI> pagesForAuthority =
+                              urlsSeen.getOrDefault(authority, HashSet.empty());
+
+                          return !pagesForAuthority.contains(uri);
+                        }))
         .whenCompleteAsync(
             (childLinks, ignored) -> {
-              if (childLinks != null) childLinks.forEach(urlsSeen::add);
+              if (childLinks != null)
+                childLinks.forEach(
+                    child ->
+                        urlsSeen.compute(
+                            child.getAuthority(),
+                            (ignoredInner, currentValue) -> {
+                              if (currentValue == null) return HashSet.of(child);
+                              else return currentValue.add(child);
+                            }));
             })
         .whenCompleteAsync(
             (childUris, throwable) -> {
@@ -165,11 +180,14 @@ public class WebCrawlerApp {
             });
   }
 
+  // -Xmx10g -XX:+UseParallelGC -XX:MaxHeapFreeRatio=60 -XX:GCTimeRatio=14
+  // -XX:MaxTenuringThreshold=16
   // -Xmx15g -XX:+UseParallelGC -XX:MaxHeapFreeRatio=60 -XX:GCTimeRatio=14 -XX:ParallelGCThreads=10
+  //    Best: -Xmx10g -XX:+UseParallelGC
   public static void main(String[] args) {
-    WebCrawlerApp app = new WebCrawlerApp(10, "superfastpython.com");
+    WebCrawlerApp app = new WebCrawlerApp(20, "superfastpython.com");
 
-    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://osxdaily.com"));
+    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://dev.java"));
     List<URI> possiblePath = possiblePathF.join();
     System.out.println("Done:");
     possiblePath.forEach(System.out::println);
