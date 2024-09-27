@@ -60,10 +60,19 @@ public class WebCrawlerApp {
       return CompletableFuture.failedFuture(e);
     }
 
+    long start = System.currentTimeMillis();
     return httpClient
         .sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
         .orTimeout(5, TimeUnit.SECONDS)
-        .thenApplyAsync(maybeBody -> extractLinks(maybeBody.body()))
+        .whenCompleteAsync(
+            (httpResponse, exception) ->
+                System.out.printf(
+                    "%d, %d, %s, %s\n",
+                    httpResponse.body().length() / 1024L,
+                    System.currentTimeMillis() - start,
+                    url.getAuthority(),
+                    url))
+        .thenApplyAsync(httpResponse -> extractLinks(httpResponse.body()))
         .thenApplyAsync(
             children -> children.filter(child -> !UNWANTED_EXTENSIONS.exists(child::endsWith)))
         .thenApplyAsync(this::parseURI)
@@ -127,8 +136,6 @@ public class WebCrawlerApp {
     }
 
     return getPermission(() -> scrapeExternalLinks(currentUri))
-        .whenCompleteAsync(
-            (l, r) -> System.out.printf("%s, %s\n", currentUri.getAuthority(), currentUri))
         .exceptionally(ignored -> HashSet.empty())
         .thenApplyAsync(
             childLinks ->
@@ -158,10 +165,11 @@ public class WebCrawlerApp {
             });
   }
 
+  // -Xmx15g -XX:+UseParallelGC -XX:MaxHeapFreeRatio=60 -XX:GCTimeRatio=14 -XX:ParallelGCThreads=10
   public static void main(String[] args) {
     WebCrawlerApp app = new WebCrawlerApp(10, "superfastpython.com");
 
-    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://www.dev.java"));
+    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://osxdaily.com"));
     List<URI> possiblePath = possiblePathF.join();
     System.out.println("Done:");
     possiblePath.forEach(System.out::println);
