@@ -29,10 +29,10 @@ public class WebCrawlerApp {
 
   private final int maxConcurrency;
   private final String destination;
-  private final AtomicInteger currentConcurrency = new AtomicInteger(0);
+  private final AtomicInteger concurrency = new AtomicInteger(0);
   private final ConcurrentLinkedQueue<CompletableFuture<Void>> queueFutures =
       new ConcurrentLinkedQueue<>();
-  private final ConcurrentHashMap<String, Set<URI>> urlsSeen = new ConcurrentHashMap<>();
+  private final java.util.Set<URI> urlsSeen = Collections.newSetFromMap(new ConcurrentHashMap<>());
   private final CompletableFuture<List<URI>> resGraph = new CompletableFuture<>();
 
   public WebCrawlerApp(int maxConcurrency, String targetUrl) {
@@ -58,7 +58,6 @@ public class WebCrawlerApp {
     long start = System.currentTimeMillis();
     return httpClient
         .sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
-        //        .orTimeout(5, TimeUnit.SECONDS)
         .whenCompleteAsync(
             (httpResponse, exception) ->
                 System.out.printf(
@@ -68,8 +67,7 @@ public class WebCrawlerApp {
                     url.getAuthority(),
                     url))
         .thenApplyAsync(httpResponse -> extractLinks(httpResponse.body()))
-        .thenApplyAsync(this::parseURI)
-        .exceptionally(ignored -> HashSet.empty());
+        .thenApplyAsync(this::parseURI);
   }
 
   private Set<URI> parseURI(Set<String> strUris) {
@@ -88,19 +86,19 @@ public class WebCrawlerApp {
   }
 
   private void returnPermission() {
-    int current = currentConcurrency.get();
+    int current = concurrency.get();
     if (current <= maxConcurrency) {
-      if (!currentConcurrency.compareAndSet(current, current)) returnPermission();
+      if (!concurrency.compareAndSet(current, current)) returnPermission();
       CompletableFuture<Void> cF = queueFutures.poll();
       if (cF != null) cF.complete(null);
-      else currentConcurrency.getAndIncrement();
-    } else currentConcurrency.getAndDecrement();
+      else concurrency.getAndIncrement();
+    } else concurrency.getAndDecrement();
   }
 
   private <V> CompletableFuture<V> getPermission(Supplier<CompletableFuture<V>> cFToRun) {
-    int current = currentConcurrency.get();
+    int current = concurrency.get();
     if (current < maxConcurrency) {
-      if (!currentConcurrency.compareAndSet(current, current + 1)) getPermission(cFToRun);
+      if (!concurrency.compareAndSet(current, current + 1)) getPermission(cFToRun);
       return cFToRun.get().whenCompleteAsync((ignoredL, ignoredR) -> returnPermission());
     }
     CompletableFuture<Void> cF = new CompletableFuture<>();
@@ -137,37 +135,17 @@ public class WebCrawlerApp {
             children ->
                 children.filter(
                     child -> child.getPath().endsWith(".html") || !child.getPath().contains(".")))
-        .thenApplyAsync(
-            children ->
-                children
-                    .filter(uri -> !uri.toString().isBlank())
-                    .filter(
-                        uri -> {
-                          String authority = uri.getAuthority();
-                          Set<URI> pagesForAuthority =
-                              urlsSeen.getOrDefault(authority, HashSet.empty());
-
-                          return !pagesForAuthority.contains(uri);
-                        }))
+        .thenApplyAsync(children -> children.filter(uri -> !urlsSeen.contains(uri)))
         .whenCompleteAsync(
             (childLinks, ignored) -> {
-              if (childLinks != null)
-                childLinks.forEach(
-                    child ->
-                        urlsSeen.compute(
-                            child.getAuthority(),
-                            (ignoredInner, currentValue) -> {
-                              if (currentValue == null) return HashSet.of(child);
-                              else return currentValue.add(child);
-                            }));
+              if (childLinks != null) childLinks.forEach(urlsSeen::add);
             })
         .whenCompleteAsync(
             (childUris, throwable) -> {
               if (childUris != null) {
                 childUris
                     .find(child -> child.getHost().contains(destination))
-                    .toJavaOptional()
-                    .ifPresent(destLink -> resGraph.complete(current.prepend(destLink)));
+                    .forEach(destLink -> resGraph.complete(current.prepend(destLink)));
               }
             })
         .thenApplyAsync(childLinks -> childLinks.map(current::prepend))
@@ -180,9 +158,6 @@ public class WebCrawlerApp {
             });
   }
 
-  // -Xmx10g -XX:+UseParallelGC -XX:MaxHeapFreeRatio=60 -XX:GCTimeRatio=14
-  // -XX:MaxTenuringThreshold=16
-  // -Xmx15g -XX:+UseParallelGC -XX:MaxHeapFreeRatio=60 -XX:GCTimeRatio=14 -XX:ParallelGCThreads=10
   //    Best: -Xmx10g -XX:+UseParallelGC
   public static void main(String[] args) {
     WebCrawlerApp app = new WebCrawlerApp(20, "superfastpython.com");
