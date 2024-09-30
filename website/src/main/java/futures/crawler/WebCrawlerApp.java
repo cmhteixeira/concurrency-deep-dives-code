@@ -32,12 +32,12 @@ public class WebCrawlerApp {
   private final AtomicInteger concurrency = new AtomicInteger(0);
   private final ConcurrentLinkedQueue<CompletableFuture<Void>> queueFutures =
       new ConcurrentLinkedQueue<>();
-  private final java.util.Set<URI> urlsSeen = Collections.newSetFromMap(new ConcurrentHashMap<>());
+  private final java.util.Set<URI> urisSeen = Collections.newSetFromMap(new ConcurrentHashMap<>());
   private final CompletableFuture<List<URI>> resGraph = new CompletableFuture<>();
 
-  public WebCrawlerApp(int maxConcurrency, String targetUrl) {
+  public WebCrawlerApp(int maxConcurrency, String targetUri) {
     this.maxConcurrency = maxConcurrency;
-    this.destination = targetUrl;
+    this.destination = targetUri;
   }
 
   private Set<String> extractLinks(String htmlDoc) {
@@ -46,11 +46,11 @@ public class WebCrawlerApp {
     return HashSet.ofAll(elements).map(element -> element.attr("abs:href"));
   }
 
-  private CompletableFuture<Set<URI>> scrapeExternalLinks(URI url) {
+  private CompletableFuture<Set<URI>> scrapeExternalLinks(URI uri) {
     HttpRequest httpRequest;
 
     try {
-      httpRequest = HttpRequest.newBuilder(url).GET().timeout(Duration.ofSeconds(1)).build();
+      httpRequest = HttpRequest.newBuilder(uri).GET().timeout(Duration.ofSeconds(2)).build();
     } catch (Exception e) {
       return CompletableFuture.failedFuture(e);
     }
@@ -64,21 +64,22 @@ public class WebCrawlerApp {
                     "%d, %d, %s, %s\n",
                     httpResponse.body().length() / 1024L,
                     System.currentTimeMillis() - start,
-                    url.getAuthority(),
-                    url))
+                    uri.getAuthority(),
+                    uri))
         .thenApplyAsync(httpResponse -> extractLinks(httpResponse.body()))
         .thenApplyAsync(this::parseURI);
   }
 
   private Set<URI> parseURI(Set<String> strUris) {
     return strUris
-        .map(
+        .flatMap(
             uriStr -> {
               try {
                 URI uri = URI.create(uriStr);
-                return new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), null, null);
+                return HashSet.of(
+                    new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), null, null));
               } catch (Exception e) {
-                throw new CompletionException("Parsing uri: " + uriStr, e);
+                return HashSet.empty();
               }
             })
         .filter(uri -> Objects.equals(uri.getScheme(), "https"))
@@ -107,8 +108,8 @@ public class WebCrawlerApp {
         .whenCompleteAsync((ignoredL, ignoredR) -> returnPermission());
   }
 
-  public CompletableFuture<List<URI>> crawl(URI startUrl) {
-    CompletableFuture<Set<List<URI>>> cF = childLinks(List.of(startUrl));
+  public CompletableFuture<List<URI>> crawl(URI startUri) {
+    CompletableFuture<Set<List<URI>>> cF = recursiveChildren(List.of(startUri));
     return resGraph.whenCompleteAsync(
         (res, ex) -> {
           String allPathsVisited = cF.join().map(k -> k.mkString(", ")).mkString("\n");
@@ -120,7 +121,7 @@ public class WebCrawlerApp {
         });
   }
 
-  private CompletableFuture<Set<List<URI>>> childLinks(List<URI> current) {
+  private CompletableFuture<Set<List<URI>>> recursiveChildren(List<URI> current) {
     URI currentUri = current.get();
     if (resGraph.isDone()) {
       return CompletableFuture.completedFuture(HashSet.of(current));
@@ -135,10 +136,10 @@ public class WebCrawlerApp {
             children ->
                 children.filter(
                     child -> child.getPath().endsWith(".html") || !child.getPath().contains(".")))
-        .thenApplyAsync(children -> children.filter(uri -> !urlsSeen.contains(uri)))
+        .thenApplyAsync(children -> children.filter(uri -> !urisSeen.contains(uri)))
         .whenCompleteAsync(
             (childLinks, ignored) -> {
-              if (childLinks != null) childLinks.forEach(urlsSeen::add);
+              if (childLinks != null) childLinks.forEach(urisSeen::add);
             })
         .whenCompleteAsync(
             (childUris, throwable) -> {
@@ -151,7 +152,8 @@ public class WebCrawlerApp {
         .thenApplyAsync(childLinks -> childLinks.map(current::prepend))
         .thenComposeAsync(
             externalLinks -> {
-              Set<CompletableFuture<Set<List<URI>>>> children = externalLinks.map(this::childLinks);
+              Set<CompletableFuture<Set<List<URI>>>> children =
+                  externalLinks.map(this::recursiveChildren);
 
               return CompletableFuture.allOf(children.toJavaArray(i -> new CompletableFuture[0]))
                   .thenApplyAsync(unused -> children.flatMap(CompletableFuture::join));
@@ -160,9 +162,9 @@ public class WebCrawlerApp {
 
   //    Best: -Xmx10g -XX:+UseParallelGC
   public static void main(String[] args) {
-    WebCrawlerApp app = new WebCrawlerApp(20, "superfastpython.com");
+    WebCrawlerApp app = new WebCrawlerApp(20, "news.ycombinator.com");
 
-    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://dev.java"));
+    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://reddit.com/r/java"));
     List<URI> possiblePath = possiblePathF.join();
     System.out.println("Done:");
     possiblePath.forEach(System.out::println);
