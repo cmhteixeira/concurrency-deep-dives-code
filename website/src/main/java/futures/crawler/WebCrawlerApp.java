@@ -58,10 +58,13 @@ public class WebCrawlerApp {
     long start = System.currentTimeMillis();
     return httpClient
         .sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+        .orTimeout(5, TimeUnit.SECONDS)
         .whenCompleteAsync(
             (httpResponse, exception) ->
                 System.out.printf(
-                    "%d, %d, %s, %s\n",
+                    "con: %d, queue:%d, %d, %d, %s, %s\n",
+                    concurrency.get(),
+                    queueFutures.size(),
                     httpResponse.body().length() / 1024L,
                     System.currentTimeMillis() - start,
                     uri.getAuthority(),
@@ -109,16 +112,22 @@ public class WebCrawlerApp {
   }
 
   public CompletableFuture<List<URI>> crawl(URI startUri) {
-    CompletableFuture<Set<List<URI>>> cF = recursiveChildren(List.of(startUri));
-    return resGraph.whenCompleteAsync(
-        (res, ex) -> {
-          String allPathsVisited = cF.join().map(k -> k.mkString(", ")).mkString("\n");
-          try (FileOutputStream oS = new FileOutputStream(Path.of("crawl-paths.csv").toFile())) {
-            oS.write(allPathsVisited.getBytes(StandardCharsets.UTF_8));
-          } catch (IOException e) {
-            throw new CompletionException("Whilst writing all paths explored ...", e);
-          }
-        });
+    return recursiveChildren(List.of(startUri))
+        .whenCompleteAsync(
+            (allPathsExplored, ignored) -> {
+              try (FileOutputStream oS =
+                  new FileOutputStream(Path.of("crawl-paths.csv").toFile())) {
+                String allPathsVisited = allPathsExplored.map(k -> k.mkString(", ")).mkString("\n");
+                oS.write(allPathsVisited.getBytes(StandardCharsets.UTF_8));
+              } catch (IOException e) {
+                throw new CompletionException("Whilst writing all paths explored.", e);
+              }
+            })
+        .thenApplyAsync(
+            allPaths -> {
+              if (resGraph.isDone()) return resGraph.join();
+              else throw new RuntimeException("No path between source and destination");
+            });
   }
 
   private CompletableFuture<Set<List<URI>>> recursiveChildren(List<URI> current) {
@@ -162,9 +171,9 @@ public class WebCrawlerApp {
 
   //    Best: -Xmx10g -XX:+UseParallelGC
   public static void main(String[] args) {
-    WebCrawlerApp app = new WebCrawlerApp(20, "news.ycombinator.com");
+    WebCrawlerApp app = new WebCrawlerApp(3, "news.ycombinator.com");
 
-    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://reddit.com/r/java"));
+    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://nytimes.com"));
     List<URI> possiblePath = possiblePathF.join();
     System.out.println("Done:");
     possiblePath.forEach(System.out::println);
