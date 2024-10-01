@@ -62,7 +62,7 @@ public class WebCrawlerApp {
         .whenCompleteAsync(
             (httpResponse, exception) ->
                 System.out.printf(
-                    "con: %d, queue:%d, %d, %d, %s, %s\n",
+                    "liveReq: %d, queueSize:%d, %d, %d, %s, %s\n",
                     concurrency.get(),
                     queueFutures.size(),
                     httpResponse.body().length() / 1024L,
@@ -90,13 +90,9 @@ public class WebCrawlerApp {
   }
 
   private void returnPermission() {
-    int current = concurrency.get();
-    if (current <= maxConcurrency) {
-      if (!concurrency.compareAndSet(current, current)) returnPermission();
-      CompletableFuture<Void> cF = queueFutures.poll();
-      if (cF != null) cF.complete(null);
-      else concurrency.getAndIncrement();
-    } else concurrency.getAndDecrement();
+    CompletableFuture<Void> cF = queueFutures.poll();
+    if (cF != null) cF.complete(null);
+    else concurrency.getAndDecrement();
   }
 
   private <V> CompletableFuture<V> getPermission(Supplier<CompletableFuture<V>> cFToRun) {
@@ -171,7 +167,7 @@ public class WebCrawlerApp {
 
   //    Best: -Xmx10g -XX:+UseParallelGC
   public static void main(String[] args) {
-    WebCrawlerApp app = new WebCrawlerApp(3, "news.ycombinator.com");
+    WebCrawlerApp app = new WebCrawlerApp(1, "news.ycombinator.com");
 
     CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://nytimes.com"));
     List<URI> possiblePath = possiblePathF.join();
