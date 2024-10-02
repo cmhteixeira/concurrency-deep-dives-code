@@ -1,13 +1,9 @@
 package futures.crawler;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -33,7 +29,6 @@ public class WebCrawlerApp {
   private final ConcurrentLinkedQueue<CompletableFuture<Void>> queueFutures =
       new ConcurrentLinkedQueue<>();
   private final java.util.Set<URI> urisSeen = Collections.newSetFromMap(new ConcurrentHashMap<>());
-  private final CompletableFuture<List<URI>> resGraph = new CompletableFuture<>();
 
   public WebCrawlerApp(int maxConcurrency, String targetUri) {
     this.maxConcurrency = maxConcurrency;
@@ -107,69 +102,55 @@ public class WebCrawlerApp {
         .whenCompleteAsync((ignoredL, ignoredR) -> returnPermission());
   }
 
-  public CompletableFuture<List<URI>> crawl(URI startUri) {
-    return recursiveChildren(List.of(startUri))
-        .whenCompleteAsync(
-            (allPathsExplored, ignored) -> {
-              try (FileOutputStream oS =
-                  new FileOutputStream(Path.of("crawl-paths.csv").toFile())) {
-                String allPathsVisited = allPathsExplored.map(k -> k.mkString(", ")).mkString("\n");
-                oS.write(allPathsVisited.getBytes(StandardCharsets.UTF_8));
-              } catch (IOException e) {
-                throw new CompletionException("Whilst writing all paths explored.", e);
-              }
-            })
-        .thenApplyAsync(
-            allPaths -> {
-              if (resGraph.isDone()) return resGraph.join();
-              else throw new RuntimeException("No path between source and destination");
-            });
+  private <T> CompletableFuture<T> anySuccessOf(Set<CompletableFuture<T>> cFs) {
+    if (cFs.isEmpty())
+      return CompletableFuture.failedFuture(new IllegalArgumentException("No futures passed in."));
+    AtomicInteger counter = new AtomicInteger(cFs.length());
+    CompletableFuture<T> cfToReturn = new CompletableFuture<>();
+    cFs.forEach(
+        cF ->
+            cF.whenCompleteAsync(
+                (success, error) -> {
+                  if (success != null) cfToReturn.complete(success);
+                  else {
+                    if (counter.decrementAndGet() == 0)
+                      cfToReturn.completeExceptionally(
+                          new CompletionException("All other futures also failed.", error));
+                  }
+                }));
+    return cfToReturn;
   }
 
-  private CompletableFuture<Set<List<URI>>> recursiveChildren(List<URI> current) {
-    URI currentUri = current.get();
-    if (resGraph.isDone()) {
-      return CompletableFuture.completedFuture(HashSet.of(current));
-    }
-
-    return getPermission(() -> scrapeExternalLinks(currentUri))
+  public CompletableFuture<List<URI>> crawlFrom(URI parent) {
+    return getPermission(() -> scrapeExternalLinks(parent))
         .exceptionally(ignored -> HashSet.empty())
         .thenApplyAsync(
             children ->
-                children.filter(child -> !child.getAuthority().equals(currentUri.getAuthority())))
+                children.filter(child -> !child.getAuthority().equals(parent.getAuthority())))
         .thenApplyAsync(
             children ->
                 children.filter(
                     child -> child.getPath().endsWith(".html") || !child.getPath().contains(".")))
         .thenApplyAsync(children -> children.filter(uri -> !urisSeen.contains(uri)))
         .whenCompleteAsync(
-            (childLinks, ignored) -> {
-              if (childLinks != null) childLinks.forEach(urisSeen::add);
-            })
-        .whenCompleteAsync(
-            (childUris, throwable) -> {
-              if (childUris != null) {
-                childUris
-                    .find(child -> child.getHost().contains(destination))
-                    .forEach(destLink -> resGraph.complete(current.prepend(destLink)));
-              }
-            })
-        .thenApplyAsync(childLinks -> childLinks.map(current::prepend))
+            (childLinks, ignored) -> childLinks.forEach(urisSeen::add))
         .thenComposeAsync(
-            externalLinks -> {
-              Set<CompletableFuture<Set<List<URI>>>> children =
-                  externalLinks.map(this::recursiveChildren);
-
-              return CompletableFuture.allOf(children.toJavaArray(i -> new CompletableFuture[0]))
-                  .thenApplyAsync(unused -> children.flatMap(CompletableFuture::join));
-            });
+            children ->
+                children
+                    .find(child -> child.getAuthority().contains(destination))
+                    .fold(
+                        () ->
+                            anySuccessOf(children.map(this::crawlFrom))
+                                .thenApplyAsync(theSet -> theSet.prepend(parent)),
+                        destinationURI ->
+                            CompletableFuture.completedFuture(List.of(destinationURI))));
   }
 
   //    Best: -Xmx10g -XX:+UseParallelGC
   public static void main(String[] args) {
-    WebCrawlerApp app = new WebCrawlerApp(1, "news.ycombinator.com");
+    WebCrawlerApp app = new WebCrawlerApp(5, "reddit.com/r/java");
 
-    CompletableFuture<List<URI>> possiblePathF = app.crawl(URI.create("https://nytimes.com"));
+    CompletableFuture<List<URI>> possiblePathF = app.crawlFrom(URI.create("https://nytimes.com"));
     List<URI> possiblePath = possiblePathF.join();
     System.out.println("Done:");
     possiblePath.forEach(System.out::println);
