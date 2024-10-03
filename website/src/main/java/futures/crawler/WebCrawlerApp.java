@@ -57,9 +57,8 @@ public class WebCrawlerApp {
         .whenCompleteAsync(
             (httpResponse, exception) ->
                 System.out.printf(
-                    "liveReq: %d, queueSize:%d, %d, %d, %s, %s\n",
+                    "liveReq: %d, %d, %d, %s, %s\n",
                     concurrency.get(),
-                    queueFutures.size(),
                     httpResponse.body().length() / 1024L,
                     System.currentTimeMillis() - start,
                     uri.getAuthority(),
@@ -81,7 +80,8 @@ public class WebCrawlerApp {
               }
             })
         .filter(uri -> Objects.equals(uri.getScheme(), "https"))
-        .filter(uri -> uri.getHost() != null && !uri.getHost().isBlank());
+        .filter(uri -> uri.getHost() != null && !uri.getHost().isBlank())
+        .filter(uri -> uri.getPath().endsWith(".html") || !uri.getPath().contains("."));
   }
 
   private void returnPermission() {
@@ -127,13 +127,8 @@ public class WebCrawlerApp {
         .thenApplyAsync(
             children ->
                 children.filter(child -> !child.getAuthority().equals(parent.getAuthority())))
-        .thenApplyAsync(
-            children ->
-                children.filter(
-                    child -> child.getPath().endsWith(".html") || !child.getPath().contains(".")))
         .thenApplyAsync(children -> children.filter(uri -> !urisSeen.contains(uri)))
-        .whenCompleteAsync(
-            (childLinks, ignored) -> childLinks.forEach(urisSeen::add))
+        .whenCompleteAsync((childLinks, ignored) -> childLinks.forEach(urisSeen::add))
         .thenComposeAsync(
             children ->
                 children
@@ -141,16 +136,17 @@ public class WebCrawlerApp {
                     .fold(
                         () ->
                             anySuccessOf(children.map(this::crawlFrom))
-                                .thenApplyAsync(theSet -> theSet.prepend(parent)),
+                                .thenApplyAsync(successPath -> successPath.prepend(parent)),
                         destinationURI ->
-                            CompletableFuture.completedFuture(List.of(destinationURI))));
+                            CompletableFuture.completedFuture(List.of(parent, destinationURI))));
   }
 
   //    Best: -Xmx10g -XX:+UseParallelGC
   public static void main(String[] args) {
-    WebCrawlerApp app = new WebCrawlerApp(5, "reddit.com/r/java");
+    WebCrawlerApp app = new WebCrawlerApp(10, "nytimes.com");
 
-    CompletableFuture<List<URI>> possiblePathF = app.crawlFrom(URI.create("https://nytimes.com"));
+    CompletableFuture<List<URI>> possiblePathF =
+        app.crawlFrom(URI.create("https://reddit.com/r/java"));
     List<URI> possiblePath = possiblePathF.join();
     System.out.println("Done:");
     possiblePath.forEach(System.out::println);
