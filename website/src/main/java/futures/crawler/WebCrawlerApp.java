@@ -123,7 +123,6 @@ public class WebCrawlerApp {
 
   public CompletableFuture<List<URI>> crawlFrom(URI parent) {
     return getPermission(() -> scrapeExternalLinks(parent))
-        .exceptionally(ignored -> HashSet.empty())
         .thenApplyAsync(
             children ->
                 children.filter(child -> !child.getAuthority().equals(parent.getAuthority())))
