@@ -21,7 +21,7 @@
     <dependencies>
         <dependency>
             <groupId>com.cmhteixeira</groupId>
-            <artifactId>exercises</artifactId>
+            <artifactId>binary-heap</artifactId>
             <version>0.1.0-SNAPSHOT</version>
         </dependency>
 
