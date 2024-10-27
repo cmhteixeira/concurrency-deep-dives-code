@@ -15,6 +15,7 @@
     <module>blocking-sockets</module>
     <module>futures</module>
     <module>schedulers</module>
+      <module>nonblocking-sockets</module>
   </modules>
 
   <properties>
