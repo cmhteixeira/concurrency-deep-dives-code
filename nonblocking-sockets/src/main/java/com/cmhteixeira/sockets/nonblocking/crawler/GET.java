@@ -1,4 +1,4 @@
-package com.cmhteixeira.java.sockets.nonblocking.crawler;
+package com.cmhteixeira.sockets.nonblocking.crawler;
 
 public record GET(String host, String path) {
 

@@ -1,13 +1,13 @@
-package com.cmhteixeira.java.sockets.nonblocking.crawler;
+package com.cmhteixeira.sockets.nonblocking.crawler;
 
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
-import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import javax.net.ssl.SSLEngineResult.Status;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
+import javax.net.ssl.SSLEngineResult.Status;
+import javax.net.ssl.SSLException;
 
 public class Foo {
   private int bufferSizes = 100_000;
@@ -107,8 +107,7 @@ public class Foo {
     System.out.printf("Write Encrypted buffer: %s\n", writeEncryptedBuffer);
     SSLEngineResult.Status status = engineResult.getStatus();
     SSLEngineResult.HandshakeStatus handshakeStatus = engineResult.getHandshakeStatus();
-    writeEncryptedBuffer.compact()
-
+    //    writeEncryptedBuffer.compact()
 
     if (status == Status.OK && handshakeStatus == HandshakeStatus.FINISHED) {
       System.out.println("Write: FINISHED");

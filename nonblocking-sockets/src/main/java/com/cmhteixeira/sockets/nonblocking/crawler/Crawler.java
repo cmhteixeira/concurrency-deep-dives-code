@@ -1,13 +1,9 @@
-package com.cmhteixeira.java.sockets.nonblocking.crawler;
+package com.cmhteixeira.sockets.nonblocking.crawler;
 
-import javax.net.SocketFactory;
-import javax.net.ssl.*;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.URL;
-import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
@@ -19,6 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import javax.net.ssl.*;
 
 public class Crawler {
 

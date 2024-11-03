@@ -1,4 +1,4 @@
-package com.cmhteixeira.java.sockets.nonblocking.httpproxy;
+package com.cmhteixeira.sockets.nonblocking.httpproxy;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

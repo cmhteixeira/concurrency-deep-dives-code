@@ -1,7 +1,6 @@
-package org.sample;
+package com.cmhteixeira.benchmarks;
 
-import java.util.Comparator;
-import java.util.PriorityQueue;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.runner.Runner;
@@ -11,49 +10,42 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 @State(Scope.Thread)
 @Threads(1)
-@OutputTimeUnit(TimeUnit.MICROSECONDS)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 50)
 @Fork(
     value = 1,
     jvmArgs = {"-Xms15G"})
-public class JavaPriorityQueue {
+public class SortingArrayList {
 
   int max = 99_999_999;
   int min = 1;
 
-  @Param({"1000", "10000", "100000", "1000000", "3000000", "7000000", "10000000"})
+  @Param({"1", "10", "100", "1000", "10000", "100000", "1000000", "10000000"})
   private int n;
 
-  PriorityQueue<Integer> queue;
+  List<Integer> queue;
 
   @Setup(Level.Iteration)
   public void setup() {
-    queue = new PriorityQueue<>(Comparator.naturalOrder());
+    queue = new ArrayList<>();
     for (int j = 0; j < n; ++j) {
       int randomWithMathRandom = (int) ((Math.random() * (max - min)) + min);
-      queue.offer(randomWithMathRandom);
+      queue.add(randomWithMathRandom);
     }
   }
 
   @Benchmark
   @BenchmarkMode({Mode.SingleShotTime})
   @Measurement(iterations = 100)
-  public void deleteMin() {
-    queue.remove();
-  }
-
-  @Benchmark
-  @BenchmarkMode({Mode.SingleShotTime})
-  @Measurement(iterations = 100)
-  public void insert() {
-    int randomWithMathRandom = (int) ((Math.random() * (max - min)) + min);
-    queue.offer(randomWithMathRandom);
+  public void javasQueue() {
+    Collections.sort(queue);
+    queue.get(0);
   }
 
   public static void main(String[] args) throws RunnerException {
     Options opt =
         new OptionsBuilder()
-            .include(JavaPriorityQueue.class.getSimpleName())
+            .include(MyBinaryHeap.class.getSimpleName())
             .forks(1)
             .threads(1)
             .build();

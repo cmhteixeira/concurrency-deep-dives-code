@@ -1,4 +1,4 @@
-package org.sample;
+package com.cmhteixeira.benchmarks;
 
 import com.cmhteixeira.MinBinaryHeap;
 import java.util.Comparator;
