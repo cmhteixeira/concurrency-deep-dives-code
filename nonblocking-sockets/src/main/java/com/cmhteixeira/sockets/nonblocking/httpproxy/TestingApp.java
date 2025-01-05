@@ -1,5 +1,7 @@
 package com.cmhteixeira.sockets.nonblocking.httpproxy;
 
+import com.cmhteixeira.sockets.nonblocking.crawler.GET;
+
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
@@ -57,9 +59,10 @@ public class TestingApp {
     socketChannel.configureBlocking(true);
     URL url = new URL("https://nytimes.com");
     socketChannel.connect(new InetSocketAddress(url.getHost(), 443));
-    TlsNegotiation tlsNegotiation =
-        new TlsNegotiation(sslEngine, new URL("https://nytimes.com"), socketChannel);
+    TlsNegotiation tlsNegotiation = new TlsNegotiation(sslEngine, socketChannel);
 
-    tlsNegotiation.run();
+    GET get = new GET(url.getHost(), "/");
+    String result = tlsNegotiation.send(get);
+    System.out.println(result);
   }
 }
