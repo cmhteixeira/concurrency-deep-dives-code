@@ -70,10 +70,16 @@ public class TlsNegotiation {
     readPlainBuffer.clear();
     read();
     readEncryptedBuffer.flip();
+    System.out.println(readEncryptedBuffer);
     System.out.println("Plain read before unwrapping: " + readPlainBuffer);
     SSLEngineResult res2 = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
     System.out.println("Plain read after unwrapping: " + readPlainBuffer);
+    System.out.println(readEncryptedBuffer);
     System.out.println(res2);
+    SSLEngineResult res3 = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
+    System.out.println("Plain read after unwrapping: " + readPlainBuffer);
+    System.out.println(readEncryptedBuffer);
+    System.out.println(res3);
     readPlainBuffer.flip();
     byte[] foo = new byte[readPlainBuffer.limit()];
     readPlainBuffer.get(foo);
