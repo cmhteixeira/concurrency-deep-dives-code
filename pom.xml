@@ -44,6 +44,7 @@
     <picocli.version>4.7.5</picocli.version>
     <jsoup.version>1.18.1</jsoup.version>
     <vavr.version>0.10.4</vavr.version>
+    <raw-http.version>2.6.0</raw-http.version>
   </properties>
 
   <build>
@@ -255,6 +256,11 @@
         <groupId>io.vavr</groupId>
         <artifactId>vavr</artifactId>
         <version>${vavr.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.athaydes.rawhttp</groupId>
+        <artifactId>rawhttp-core</artifactId>
+        <version>${raw-http.version}</version>
       </dependency>
 
       <dependency>

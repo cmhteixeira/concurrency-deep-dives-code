@@ -1,24 +1,21 @@
 package com.cmhteixeira.sockets.nonblocking.httpproxy;
 
-import com.cmhteixeira.sockets.nonblocking.crawler.GET;
-
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
-import java.io.IOException;
-import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.channels.Selector;
-import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
-
 import static javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import static javax.net.ssl.SSLEngineResult.HandshakeStatus.*;
 import static javax.net.ssl.SSLEngineResult.Status;
 import static javax.net.ssl.SSLEngineResult.Status.*;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+
 public class TlsNegotiation {
 
-  private OverallStatus overallStatus;
+  private OverallState overallState;
 
   private static int SIZE_BUFFERS = 10_000;
   //  private URL webpage;
@@ -45,67 +42,101 @@ public class TlsNegotiation {
         ByteBuffer.allocateDirect(sslEngine.getSession().getPacketBufferSize());
     //    this.webpage = webpage;
     this.selector = Selector.open();
-    this.overallStatus = OverallStatus.NEGOTIATING;
+    this.overallState = OverallState.NEGOTIATING;
   }
 
-  public String send(GET req) throws IOException {
-    if (overallStatus == OverallStatus.NEGOTIATING) start();
-
-    System.out.println("##################");
-    System.out.println("Finished negotiation ...");
+  private void printAllBuffers() {
+    System.out.println("###############");
     System.out.println("Plain read: " + readPlainBuffer);
     System.out.println("Encrypted read: " + readEncryptedBuffer);
     System.out.println("Plain write: " + writePlainBuffer);
     System.out.println("Encrypted write: " + writeEncryptedBuffer);
-    System.out.println("Sending ...");
+    System.out.println("###############");
+  }
+
+  private void recursiveSend(HandshakeStatus handshakeStatus, Status status, int iter)
+      throws IOException {
+    if (handshakeStatus != FINISHED && handshakeStatus != NOT_HANDSHAKING) {
+      throw new RuntimeException("New Handshake required??");
+    }
+
+    switch (status) {
+      case BUFFER_UNDERFLOW -> {
+        System.out.println("sending, BUFFER_UNDERFLOW");
+        read();
+        SSLEngineResult res = sslEngine.wrap(writePlainBuffer, writeEncryptedBuffer.flip());
+        recursiveSend(res.getHandshakeStatus(), res.getStatus(), iter + 1);
+      }
+      case BUFFER_OVERFLOW -> {
+        throw new RuntimeException("BUFFER_OVERFLOW ???");
+      }
+      case OK -> {
+        printAllBuffers();
+        write();
+        read();
+        printAllBuffers();
+        SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer.clear());
+        System.out.println(res);
+      }
+      case CLOSED -> throw new RuntimeException("CLOSEED???");
+    }
+  }
+
+  private void send2() throws IOException {
+    printAllBuffers();
+    SSLEngineResult res = sslEngine.wrap(writePlainBuffer, writeEncryptedBuffer);
+    recursiveSend(res.getHandshakeStatus(), res.getStatus(), 0);
+  }
+
+  public String send(String req) throws IOException {
+    if (overallState == OverallState.NEGOTIATING) start();
+    System.out.println("Finished negotiation ...");
+
     writeEncryptedBuffer.clear(); // yes
     writePlainBuffer.clear(); // yes
-    writePlainBuffer.put(req.encodeHttpRequest().getBytes(StandardCharsets.UTF_8));
+    writePlainBuffer.put(req.getBytes(StandardCharsets.UTF_8));
     writePlainBuffer.flip();
-    SSLEngineResult res = sslEngine.wrap(writePlainBuffer, writeEncryptedBuffer);
-    System.out.println(res);
-    writeEncryptedBuffer.flip();
-    write();
-    readEncryptedBuffer.compact();
-    readPlainBuffer.clear();
-    read();
-    readEncryptedBuffer.flip();
-    System.out.println(readEncryptedBuffer);
-    System.out.println("Plain read before unwrapping: " + readPlainBuffer);
-    SSLEngineResult res2 = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
-    System.out.println("Plain read after unwrapping: " + readPlainBuffer);
-    System.out.println(readEncryptedBuffer);
-    System.out.println(res2);
-    SSLEngineResult res3 = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
-    System.out.println("Plain read after unwrapping: " + readPlainBuffer);
-    System.out.println(readEncryptedBuffer);
-    System.out.println(res3);
+    send2();
+
+    //
+    //
+    //
+    //    readEncryptedBuffer.flip();
+    //    System.out.println(readEncryptedBuffer);
+    //    System.out.println("Plain read before unwrapping: " + readPlainBuffer);
+    //    SSLEngineResult res2 = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
+    //    System.out.println("Plain read after unwrapping: " + readPlainBuffer);
+    //    System.out.println(readEncryptedBuffer);
+    //    System.out.println(res2);
+    //    SSLEngineResult res3 = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
+    //    System.out.println("Plain read after unwrapping: " + readPlainBuffer);
+    //    System.out.println(readEncryptedBuffer);
+    //    System.out.println(res3);
     readPlainBuffer.flip();
     byte[] foo = new byte[readPlainBuffer.limit()];
     readPlainBuffer.get(foo);
     var t = new String(foo, StandardCharsets.UTF_8);
-    System.out.printf("Result: %s\n", t);
+
+    System.out.println("#############");
+    printAllBuffers();
+    System.out.println("#############");
     return t;
   }
 
   public void start() throws IOException {
-    sslEngine.setUseClientMode(true);
-
     SSLEngineResult sslEngineResult = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
     recursive(sslEngineResult.getHandshakeStatus(), sslEngineResult.getStatus(), 0);
   }
 
   private void recursive(HandshakeStatus handshakeStatus, Status status, int iter)
       throws IOException {
-    if (iter > 20) {
-      System.out.println("Max iterations: " + iter);
-      return;
-    }
+    if (iter > 20) throw new RuntimeException("Something is up... couldn't complete handshake..");
+
     System.out.println("############################");
     System.out.printf("Status=%s + HandshakeStatus=%s\n", status, handshakeStatus);
     if (status == OK && handshakeStatus == FINISHED) {
       System.out.println("Read: FINISHED");
-      overallStatus = OverallStatus.NORMAL;
+      overallState = OverallState.NORMAL;
     } else if (status == OK && handshakeStatus == NEED_TASK) {
       System.out.println("Read: NEED TASK");
       Runnable task = sslEngine.getDelegatedTask(); // should not block current thread
@@ -174,8 +205,32 @@ public class TlsNegotiation {
     System.out.printf("After reading %d: %s\n", bytesRead, readEncryptedBuffer);
   }
 
-  private enum OverallStatus {
-    NORMAL,
-    NEGOTIATING;
+  private void write2() throws IOException {
+    if (writeEncryptedBuffer.remaining() != socketChannel.write(writeEncryptedBuffer))
+      throw new IllegalStateException(
+          "Didn't write to TCP buffer all the available data available to be written.");
+
+    switch (overallState) {
+      case OverallState.Negotiating ignored -> throw new IllegalStateException("Shouldn't be possible");
+      case OverallState.Normal normal ->
+    }
+  }
+
+  private void read2() throws IOException {
+    int bytesRead = socketChannel.read(readEncryptedBuffer);
+    if (bytesRead == 0) throw new IllegalStateException("Read 0 bytes from network");
+  }
+
+  private sealed interface OverallState {
+    Normal NORMAL = normal(false, false);
+    Negotiating NEGOTIATING = new Negotiating();
+
+    static Normal normal(boolean leftToWrap, boolean leftToUnwrap) {
+      return new Normal(leftToWrap, leftToUnwrap);
+    }
+
+    record Normal(boolean leftToEncode, boolean leftToDecode) implements OverallState {}
+
+    record Negotiating() implements OverallState {}
   }
 }

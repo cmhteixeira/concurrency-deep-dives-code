@@ -1,28 +1,23 @@
 package com.cmhteixeira.sockets.nonblocking.httpproxy;
 
-import com.cmhteixeira.sockets.nonblocking.crawler.GET;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.TrustManagerFactory;
+import com.cmhteixeira.sockets.nonblocking.httpclient.HttpClient;
+import com.cmhteixeira.sockets.nonblocking.httpclient.HttpClientImpl;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URL;
-import java.nio.channels.SocketChannel;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.*;
 import java.security.cert.CertificateException;
+import java.util.Scanner;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import rawhttp.core.*;
 
 public class TestingApp {
 
-  private SSLContext sslContext;
-
-  private TestingApp(SSLContext sslContext) {
-    this.sslContext = sslContext;
-  }
-
-  public static TestingApp make()
+  public static SSLContext defaultSslContext()
       throws NoSuchAlgorithmException,
           KeyManagementException,
           KeyStoreException,
@@ -40,11 +35,7 @@ public class TestingApp {
     tmf.init(keyStore);
 
     sslContext.init(null, tmf.getTrustManagers(), secureRandom);
-    return new TestingApp(sslContext);
-  }
-
-  public SSLEngine sslEngine() {
-    return sslContext.createSSLEngine();
+    return sslContext;
   }
 
   public static void main(String[] args)
@@ -52,17 +43,27 @@ public class TestingApp {
           NoSuchAlgorithmException,
           KeyStoreException,
           IOException,
-          KeyManagementException {
-    TestingApp testingApp = TestingApp.make();
-    SSLEngine sslEngine = testingApp.sslEngine();
-    SocketChannel socketChannel = SocketChannel.open();
-    socketChannel.configureBlocking(true);
-    URL url = new URL("https://nytimes.com");
-    socketChannel.connect(new InetSocketAddress(url.getHost(), 443));
-    TlsNegotiation tlsNegotiation = new TlsNegotiation(sslEngine, socketChannel);
+          KeyManagementException,
+          URISyntaxException,
+          InterruptedException {
+    Scanner scanner = new Scanner(System.in);
+    String host = scanner.nextLine();
+    URI uri = new URI("https", null, host, 443, "/", null, null);
+    HttpClient httpClient = new HttpClientImpl(TestingApp.defaultSslContext());
 
-    GET get = new GET(url.getHost(), "/");
-    String result = tlsNegotiation.send(get);
-    System.out.println(result);
+    RawHttpResponse<Void> res =
+        httpClient.send(
+            new RawHttpRequest(
+                new RequestLine("GET", uri, HttpVersion.HTTP_1_1),
+                RawHttpHeaders.newBuilder()
+                    .with("User-Agent", "curl/7.68.0")
+                    .with("Accept", "*/*")
+                    .with("Connection", "close")
+                    .with("Host", uri.getHost())
+                    .build(),
+                null,
+                null));
+
+    System.out.println(res);
   }
 }
