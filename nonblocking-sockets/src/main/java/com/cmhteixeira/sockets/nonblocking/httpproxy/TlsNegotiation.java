@@ -85,6 +85,7 @@ public class TlsNegotiation {
   private void send2() throws IOException {
     printAllBuffers();
     SSLEngineResult res = sslEngine.wrap(writePlainBuffer, writeEncryptedBuffer);
+    overallState = overallState.hasLeftToEncode(writeEncryptedBuffer.hasRemaining());
     recursiveSend(res.getHandshakeStatus(), res.getStatus(), 0);
   }
 
@@ -96,6 +97,8 @@ public class TlsNegotiation {
     writePlainBuffer.clear(); // yes
     writePlainBuffer.put(req.getBytes(StandardCharsets.UTF_8));
     writePlainBuffer.flip();
+
+    overallState = new OverallState.Normal(true, readEncryptedBuffer.hasRemaining());
     send2();
 
     //
@@ -209,28 +212,38 @@ public class TlsNegotiation {
     if (writeEncryptedBuffer.remaining() != socketChannel.write(writeEncryptedBuffer))
       throw new IllegalStateException(
           "Didn't write to TCP buffer all the available data available to be written.");
-
-    switch (overallState) {
-      case OverallState.Negotiating ignored -> throw new IllegalStateException("Shouldn't be possible");
-      case OverallState.Normal normal ->
-    }
+    writeEncryptedBuffer.clear();
   }
 
   private void read2() throws IOException {
     int bytesRead = socketChannel.read(readEncryptedBuffer);
     if (bytesRead == 0) throw new IllegalStateException("Read 0 bytes from network");
+    readEncryptedBuffer.flip();
   }
 
   private sealed interface OverallState {
     Normal NORMAL = normal(false, false);
     Negotiating NEGOTIATING = new Negotiating();
 
+    Normal hasLeftToEncode(boolean has);
+
     static Normal normal(boolean leftToWrap, boolean leftToUnwrap) {
       return new Normal(leftToWrap, leftToUnwrap);
     }
 
-    record Normal(boolean leftToEncode, boolean leftToDecode) implements OverallState {}
+    record Normal(boolean leftToEncode, boolean leftToDecode) implements OverallState {
 
-    record Negotiating() implements OverallState {}
+      @Override
+      public Normal hasLeftToEncode(boolean has) {
+        return new Normal(true, this.leftToDecode);
+      }
+    }
+
+    record Negotiating() implements OverallState {
+      @Override
+      public Normal hasLeftToEncode(boolean has) {
+        throw new IllegalStateException("kaBoom!");
+      }
+    }
   }
 }
