@@ -7,6 +7,4 @@ import rawhttp.core.RawHttpResponse;
 
 public interface HttpClient {
   RawHttpResponse<Void> send(RawHttpRequest req) throws IOException, InterruptedException;
-
-  CompletionStage<RawHttpResponse<Void>> sendAsync(RawHttpRequest req);
 }
