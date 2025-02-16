@@ -33,11 +33,7 @@ public class HttpClientImpl implements HttpClient {
     socketChannel.connect(new InetSocketAddress(req.getUri().getHost(), req.getUri().getPort()));
     TlsNegotiation tlsNegotiation = new TlsNegotiation(this.sslEngine, socketChannel);
     tlsNegotiation.write(ByteBuffer.wrap(req.toString().getBytes(StandardCharsets.UTF_8)));
-    ByteBuffer response =
-        ByteBuffer.allocate(10000); // fix this, maybe by creating inputstream that loops?
-    tlsNegotiation.read(response);
-    System.out.println(response);
     RawHttp rwaHttp = new RawHttp();
-    return rwaHttp.parseResponse(new ByteArrayInputStream(response.flip().array()));
+    return rwaHttp.parseResponse(tlsNegotiation.getInputStream());
   }
 }

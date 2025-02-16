@@ -5,7 +5,9 @@ import static javax.net.ssl.SSLEngineResult.HandshakeStatus.*;
 import static javax.net.ssl.SSLEngineResult.Status;
 import static javax.net.ssl.SSLEngineResult.Status.*;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import javax.net.ssl.SSLEngine;
@@ -22,6 +24,7 @@ public class TlsNegotiation {
   private ByteBuffer readEncryptedBuffer;
   private ByteBuffer writePlainBuffer;
   private ByteBuffer writeEncryptedBuffer;
+  private MyInputStream inputStream;
 
   public TlsNegotiation(SSLEngine sslEngine, SocketChannel socketChannel) {
     this.sslEngine = sslEngine;
@@ -34,8 +37,8 @@ public class TlsNegotiation {
         ByteBuffer.allocateDirect(sslEngine.getSession().getApplicationBufferSize());
     this.writeEncryptedBuffer =
         ByteBuffer.allocateDirect(sslEngine.getSession().getPacketBufferSize());
-    //    this.webpage = webpage;
     this.overallState = OverallState.NEGOTIATING;
+    this.inputStream = new MyInputStream();
   }
 
   public void write(ByteBuffer src) throws IOException {
@@ -60,11 +63,10 @@ public class TlsNegotiation {
     System.out.println("Finished writing ...");
   }
 
-  public int read(ByteBuffer src) throws IOException {
-    int bytesRead = recursiveRead(NOT_HANDSHAKING, OK, 0);
-    printReadBuffers();
-    src.put(readPlainBuffer.flip());
-    return bytesRead;
+
+  public InputStream getInputStream() {
+    readPlainBuffer.position(readPlainBuffer.limit()); // temporary hack.
+    return inputStream;
   }
 
   private int recursiveRead(HandshakeStatus handshakeStatus, Status status, int iter)
@@ -85,7 +87,10 @@ public class TlsNegotiation {
         SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer.flip(), readPlainBuffer);
         System.out.println(res);
         printReadBuffers();
-        yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
+        if (res.bytesProduced() != 0) {
+          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
+          yield res.bytesProduced();
+        } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
       case BUFFER_OVERFLOW ->
           throw new IllegalStateException("Don't know what to do... BUFFER_OVERFLOW");
@@ -269,6 +274,46 @@ public class TlsNegotiation {
       public Normal hasLeftToEncode(boolean has) {
         throw new IllegalStateException("kaBoom!");
       }
+    }
+  }
+
+  private class MyInputStream extends InputStream {
+    private void readInternal() throws IOException {
+      recursiveRead(NOT_HANDSHAKING, OK, 0);
+      printReadBuffers();
+      readPlainBuffer.flip();
+    }
+
+    @Override
+    public int read() throws IOException {
+      if (!readPlainBuffer.hasRemaining()) {
+        readPlainBuffer.clear();
+        readInternal();
+      }
+      return readPlainBuffer.get() & 0xFF;
+    }
+
+    @Override
+    public long skip(long n) {
+      if (n < 0) return 0L;
+      int toDiscard = (int) Math.min(readPlainBuffer.remaining(), n);
+      readPlainBuffer.position(readPlainBuffer.position() + toDiscard);
+      return toDiscard;
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException {
+      if (off < 0 || len < 0 || off + len > b.length)
+        throw new IndexOutOfBoundsException("Invalid offset or length.");
+      if (len == 0) return 0;
+      int toRead = Math.min(readPlainBuffer.remaining(), len);
+      if (toRead == 0) {
+        readPlainBuffer.clear();
+        readInternal();
+        return read(b, off, len);
+      }
+      readPlainBuffer.get(b, off, len);
+      return toRead;
     }
   }
 }
