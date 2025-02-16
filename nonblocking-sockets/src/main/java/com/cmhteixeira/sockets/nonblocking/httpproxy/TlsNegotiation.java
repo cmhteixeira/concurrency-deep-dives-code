@@ -7,7 +7,6 @@ import static javax.net.ssl.SSLEngineResult.Status.*;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
@@ -16,19 +15,15 @@ public class TlsNegotiation {
 
   private OverallState overallState;
 
-  private static int SIZE_BUFFERS = 10_000;
-  //  private URL webpage;
   private SSLEngine sslEngine;
   private SocketChannel socketChannel;
-
-  private Selector selector;
 
   private ByteBuffer readPlainBuffer;
   private ByteBuffer readEncryptedBuffer;
   private ByteBuffer writePlainBuffer;
   private ByteBuffer writeEncryptedBuffer;
 
-  public TlsNegotiation(SSLEngine sslEngine, SocketChannel socketChannel) throws IOException {
+  public TlsNegotiation(SSLEngine sslEngine, SocketChannel socketChannel) {
     this.sslEngine = sslEngine;
     this.socketChannel = socketChannel;
     this.readPlainBuffer =
@@ -40,7 +35,6 @@ public class TlsNegotiation {
     this.writeEncryptedBuffer =
         ByteBuffer.allocateDirect(sslEngine.getSession().getPacketBufferSize());
     //    this.webpage = webpage;
-    this.selector = Selector.open();
     this.overallState = OverallState.NEGOTIATING;
   }
 
@@ -54,7 +48,7 @@ public class TlsNegotiation {
       overallState = new OverallState.Normal(true, readEncryptedBuffer.hasRemaining());
       System.out.println("Finished negotiation ...");
     }
-    printAllBuffers();
+    printWriteBuffers();
 
     writeEncryptedBuffer.clear(); // yes
     writePlainBuffer.clear(); // yes
@@ -62,18 +56,12 @@ public class TlsNegotiation {
     writePlainBuffer.flip();
     SSLEngineResult res = sslEngine.wrap(writePlainBuffer, writeEncryptedBuffer);
     recursiveSend(res.getHandshakeStatus(), res.getStatus(), 0);
-    printAllBuffers();
+    printWriteBuffers();
     System.out.println("Finished writing ...");
   }
 
   public int read(ByteBuffer src) throws IOException {
-    SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
-    System.out.println(res);
-    printReadBuffers();
-    readEncryptedBuffer.clear();
-    read();
-    readEncryptedBuffer.flip();
-    int bytesRead = recursiveRead(res.getHandshakeStatus(), res.getStatus(), 0);
+    int bytesRead = recursiveRead(NOT_HANDSHAKING, OK, 0);
     printReadBuffers();
     src.put(readPlainBuffer.flip());
     return bytesRead;
@@ -89,11 +77,6 @@ public class TlsNegotiation {
 
     printReadBuffers();
 
-    if (!readEncryptedBuffer.hasRemaining() && status != BUFFER_UNDERFLOW) {
-      System.out.println("Finished???");
-      return 0;
-    }
-
     return switch (status) {
       case BUFFER_UNDERFLOW -> {
         readEncryptedBuffer.compact();
@@ -104,15 +87,16 @@ public class TlsNegotiation {
         printReadBuffers();
         yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
-      case BUFFER_OVERFLOW -> {
-        throw new IllegalStateException("Don't know what to do... BUFFER_OVERFLOW");
-      }
+      case BUFFER_OVERFLOW ->
+          throw new IllegalStateException("Don't know what to do... BUFFER_OVERFLOW");
       case OK -> {
         SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
         System.out.println(res);
         printReadBuffers();
-        if (res.bytesProduced() != 0) yield res.bytesProduced();
-        else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
+        if (res.bytesProduced() != 0) {
+          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
+          yield res.bytesProduced();
+        } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
       case CLOSED -> throw new RuntimeException("CLOSEED???");
     };
@@ -120,24 +104,24 @@ public class TlsNegotiation {
 
   private void printAllBuffers() {
     System.out.println("###############");
-    System.out.println("Plain read: " + readPlainBuffer);
-    System.out.println("Encrypted read: " + readEncryptedBuffer);
-    System.out.println("Plain write: " + writePlainBuffer);
-    System.out.println("Encrypted write: " + writeEncryptedBuffer);
+    System.out.println("readPlainBuffer: " + readPlainBuffer);
+    System.out.println("readEncryptedBuffer: " + readEncryptedBuffer);
+    System.out.println("writePlainBuffer: " + writePlainBuffer);
+    System.out.println("writeEncryptedBuffer: " + writeEncryptedBuffer);
     System.out.println("###############");
   }
 
   private void printWriteBuffers() {
     System.out.println("###############");
-    System.out.println("Plain write: " + writePlainBuffer);
-    System.out.println("Encrypted write: " + writeEncryptedBuffer);
+    System.out.println("writePlainBuffer: " + writePlainBuffer);
+    System.out.println("writeEncryptedBuffer: " + writeEncryptedBuffer);
     System.out.println("###############");
   }
 
   private void printReadBuffers() {
     System.out.println("###############");
-    System.out.println("Plain read: " + readPlainBuffer);
-    System.out.println("Encrypted read: " + readEncryptedBuffer);
+    System.out.println("readPlainBuffer: " + readPlainBuffer);
+    System.out.println("readEncryptedBuffer: " + readEncryptedBuffer);
     System.out.println("###############");
   }
 
@@ -164,9 +148,9 @@ public class TlsNegotiation {
       case BUFFER_OVERFLOW ->
           throw new IllegalStateException("Don't know what to do ...BUFFER_OVERFLOW");
       case OK -> {
-        printAllBuffers();
+        printWriteBuffers();
         write();
-        printAllBuffers();
+        printWriteBuffers();
         if (writeEncryptedBuffer.hasRemaining()) {
           System.out.println("WARNING...");
           recursiveSend(handshakeStatus, status, iter + 1);
@@ -260,19 +244,6 @@ public class TlsNegotiation {
     System.out.printf("Before reading: %s\n", readEncryptedBuffer);
     int bytesRead = socketChannel.read(readEncryptedBuffer);
     System.out.printf("After reading %d: %s\n", bytesRead, readEncryptedBuffer);
-  }
-
-  private void write2() throws IOException {
-    if (writeEncryptedBuffer.remaining() != socketChannel.write(writeEncryptedBuffer))
-      throw new IllegalStateException(
-          "Didn't write to TCP buffer all the available data available to be written.");
-    writeEncryptedBuffer.clear();
-  }
-
-  private void read2() throws IOException {
-    int bytesRead = socketChannel.read(readEncryptedBuffer);
-    if (bytesRead == 0) throw new IllegalStateException("Read 0 bytes from network");
-    readEncryptedBuffer.flip();
   }
 
   private sealed interface OverallState {
