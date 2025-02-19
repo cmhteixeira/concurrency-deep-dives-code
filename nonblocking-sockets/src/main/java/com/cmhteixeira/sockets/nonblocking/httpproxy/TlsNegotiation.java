@@ -14,8 +14,6 @@ import javax.net.ssl.SSLEngineResult;
 
 public class TlsNegotiation {
 
-  private OverallState overallState;
-
   private SSLEngine sslEngine;
   private SocketChannel socketChannel;
 
@@ -36,7 +34,6 @@ public class TlsNegotiation {
         ByteBuffer.allocateDirect(sslEngine.getSession().getApplicationBufferSize());
     this.writeEncryptedBuffer =
         ByteBuffer.allocateDirect(sslEngine.getSession().getPacketBufferSize());
-    this.overallState = OverallState.NEGOTIATING;
     this.inputStream = new MyInputStream();
   }
 
@@ -44,12 +41,10 @@ public class TlsNegotiation {
     if (src.capacity() > writeEncryptedBuffer.capacity())
       throw new IllegalArgumentException("Too much... feed me less");
 
-    if (overallState == OverallState.NEGOTIATING) {
-      SSLEngineResult sslEngineResult = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
-      recursiveNegotiaton(sslEngineResult.getHandshakeStatus(), sslEngineResult.getStatus(), 0);
-      overallState = new OverallState.Normal(true, readEncryptedBuffer.hasRemaining());
-      System.out.println("Finished negotiation ...");
-    }
+    SSLEngineResult sslEngineResult = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
+    recursiveNegotiaton(sslEngineResult.getHandshakeStatus(), sslEngineResult.getStatus(), 0);
+    System.out.println("Finished negotiation ...");
+
     printWriteBuffers();
 
     writeEncryptedBuffer.clear(); // yes
@@ -90,8 +85,8 @@ public class TlsNegotiation {
           yield res.bytesProduced();
         } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
-      case BUFFER_OVERFLOW -> throw new IllegalStateException(
-          "Don't know what to do... BUFFER_OVERFLOW");
+      case BUFFER_OVERFLOW ->
+          throw new IllegalStateException("Don't know what to do... BUFFER_OVERFLOW");
       case OK -> {
         SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
         System.out.println(res);
@@ -146,10 +141,10 @@ public class TlsNegotiation {
     }
 
     switch (status) {
-      case BUFFER_UNDERFLOW -> throw new IllegalStateException(
-          "Don't know what to do ...BUFFER_UNDERFLOW");
-      case BUFFER_OVERFLOW -> throw new IllegalStateException(
-          "Don't know what to do ...BUFFER_OVERFLOW");
+      case BUFFER_UNDERFLOW ->
+          throw new IllegalStateException("Don't know what to do ...BUFFER_UNDERFLOW");
+      case BUFFER_OVERFLOW ->
+          throw new IllegalStateException("Don't know what to do ...BUFFER_OVERFLOW");
       case OK -> {
         printWriteBuffers();
         write();
@@ -176,7 +171,6 @@ public class TlsNegotiation {
     System.out.printf("Status=%s + HandshakeStatus=%s\n", status, handshakeStatus);
     if (status == OK && handshakeStatus == FINISHED) {
       System.out.println("Read: FINISHED");
-      overallState = OverallState.NORMAL;
     } else if (status == OK && handshakeStatus == NEED_TASK) {
       System.out.println("Read: NEED TASK");
       Runnable task = sslEngine.getDelegatedTask(); // should not block current thread
@@ -247,32 +241,6 @@ public class TlsNegotiation {
     System.out.printf("Before reading: %s\n", readEncryptedBuffer);
     int bytesRead = socketChannel.read(readEncryptedBuffer);
     System.out.printf("After reading %d: %s\n", bytesRead, readEncryptedBuffer);
-  }
-
-  private sealed interface OverallState {
-    Normal NORMAL = normal(false, false);
-    Negotiating NEGOTIATING = new Negotiating();
-
-    Normal hasLeftToEncode(boolean has);
-
-    static Normal normal(boolean leftToWrap, boolean leftToUnwrap) {
-      return new Normal(leftToWrap, leftToUnwrap);
-    }
-
-    record Normal(boolean leftToEncode, boolean leftToDecode) implements OverallState {
-
-      @Override
-      public Normal hasLeftToEncode(boolean has) {
-        return new Normal(true, this.leftToDecode);
-      }
-    }
-
-    record Negotiating() implements OverallState {
-      @Override
-      public Normal hasLeftToEncode(boolean has) {
-        throw new IllegalStateException("kaBoom!");
-      }
-    }
   }
 
   private class MyInputStream extends InputStream {
