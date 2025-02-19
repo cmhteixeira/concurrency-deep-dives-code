@@ -5,7 +5,6 @@ import static javax.net.ssl.SSLEngineResult.HandshakeStatus.*;
 import static javax.net.ssl.SSLEngineResult.Status;
 import static javax.net.ssl.SSLEngineResult.Status.*;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -63,7 +62,6 @@ public class TlsNegotiation {
     System.out.println("Finished writing ...");
   }
 
-
   public InputStream getInputStream() {
     readPlainBuffer.position(readPlainBuffer.limit()); // temporary hack.
     return inputStream;
@@ -88,18 +86,18 @@ public class TlsNegotiation {
         System.out.println(res);
         printReadBuffers();
         if (res.bytesProduced() != 0) {
-//          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
+          //          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
           yield res.bytesProduced();
         } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
-      case BUFFER_OVERFLOW ->
-          throw new IllegalStateException("Don't know what to do... BUFFER_OVERFLOW");
+      case BUFFER_OVERFLOW -> throw new IllegalStateException(
+          "Don't know what to do... BUFFER_OVERFLOW");
       case OK -> {
         SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
         System.out.println(res);
         printReadBuffers();
         if (res.bytesProduced() != 0) {
-//          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
+          //          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
           yield res.bytesProduced();
         } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
@@ -148,10 +146,10 @@ public class TlsNegotiation {
     }
 
     switch (status) {
-      case BUFFER_UNDERFLOW ->
-          throw new IllegalStateException("Don't know what to do ...BUFFER_UNDERFLOW");
-      case BUFFER_OVERFLOW ->
-          throw new IllegalStateException("Don't know what to do ...BUFFER_OVERFLOW");
+      case BUFFER_UNDERFLOW -> throw new IllegalStateException(
+          "Don't know what to do ...BUFFER_UNDERFLOW");
+      case BUFFER_OVERFLOW -> throw new IllegalStateException(
+          "Don't know what to do ...BUFFER_OVERFLOW");
       case OK -> {
         printWriteBuffers();
         write();

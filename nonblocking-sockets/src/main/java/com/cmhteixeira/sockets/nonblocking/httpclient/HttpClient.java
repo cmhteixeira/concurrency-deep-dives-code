@@ -1,7 +1,6 @@
 package com.cmhteixeira.sockets.nonblocking.httpclient;
 
 import java.io.IOException;
-import java.util.concurrent.CompletionStage;
 import rawhttp.core.RawHttpRequest;
 import rawhttp.core.RawHttpResponse;
 

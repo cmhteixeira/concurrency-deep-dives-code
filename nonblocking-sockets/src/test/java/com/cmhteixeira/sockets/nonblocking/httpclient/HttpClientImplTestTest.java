@@ -1,11 +1,6 @@
 package com.cmhteixeira.sockets.nonblocking.httpclient;
 
 import com.cmhteixeira.sockets.nonblocking.httpproxy.TestingApp;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import rawhttp.core.*;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -13,6 +8,10 @@ import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import rawhttp.core.*;
 
 public class HttpClientImplTestTest {
 
@@ -29,7 +28,21 @@ public class HttpClientImplTestTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"www.nytimes.com"})
+  @ValueSource(
+      strings = {
+        //        "www.foreignaffairs.com",
+        //        "www.foreignpolicy.com",
+        //        "www.observador.pt",
+        //        "www.latimes.com",
+        "www.nytimes.com",
+        "www.sapo.pt",
+        "www.ft.com",
+        //        "www.economist.com",
+        //        "www.wsj.com",
+        //        "www.reuters.com",
+        "www.bloomberg.com",
+        //        "www.washingtonpost.com",
+      })
   void httpsRequests(String host) throws IOException, InterruptedException, URISyntaxException {
     URI uri = new URI("https", null, host, 443, "/", null, null);
     RawHttpResponse<Void> response =
@@ -44,5 +57,6 @@ public class HttpClientImplTestTest {
                     .build(),
                 null,
                 null));
+    System.out.println(response);
   }
 }
