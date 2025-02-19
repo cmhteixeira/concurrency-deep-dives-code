@@ -88,7 +88,7 @@ public class TlsNegotiation {
         System.out.println(res);
         printReadBuffers();
         if (res.bytesProduced() != 0) {
-          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
+//          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
           yield res.bytesProduced();
         } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
@@ -99,7 +99,7 @@ public class TlsNegotiation {
         System.out.println(res);
         printReadBuffers();
         if (res.bytesProduced() != 0) {
-          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
+//          if (!readEncryptedBuffer.hasRemaining()) readEncryptedBuffer.clear();
           yield res.bytesProduced();
         } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }

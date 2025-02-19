@@ -30,7 +30,7 @@
     <akka.actor.version>2.6.5</akka.actor.version>
     <scodec.version>1.1.22</scodec.version>
     <jline.version>3.22.0</jline.version>
-    <junit.version>5.9.1</junit.version>
+    <junit.version>5.10.0</junit.version>
     <junit5perf.version>1.35.0</junit5perf.version>
     <google.guava.version>31.1-jre</google.guava.version>
     <java.tuples.version>1.2</java.tuples.version>
@@ -278,6 +278,12 @@
       <dependency>
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter-engine</artifactId>
+        <version>${junit.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-params</artifactId>
         <version>${junit.version}</version>
         <scope>test</scope>
       </dependency>
