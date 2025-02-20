@@ -6,8 +6,11 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import rawhttp.core.*;
 
 public class HttpClientImpl implements HttpClient {
@@ -20,8 +23,7 @@ public class HttpClientImpl implements HttpClient {
 
   @Override
   public RawHttpResponse<Void> send(RawHttpRequest req) throws IOException {
-    SSLEngine sslEngine = this.sslContext.createSSLEngine();
-    sslEngine.setUseClientMode(true);
+    SSLEngine sslEngine = configureSSLEngine(req.getUri().getHost());
     SocketChannel socketChannel = SocketChannel.open();
     socketChannel.configureBlocking(true);
     socketChannel.connect(new InetSocketAddress(req.getUri().getHost(), req.getUri().getPort()));
@@ -29,5 +31,14 @@ public class HttpClientImpl implements HttpClient {
     tlsNegotiation.write(ByteBuffer.wrap(req.toString().getBytes(StandardCharsets.UTF_8)));
     RawHttp rwaHttp = new RawHttp();
     return rwaHttp.parseResponse(tlsNegotiation.getInputStream());
+  }
+
+  private SSLEngine configureSSLEngine(String host) {
+    SSLEngine sslEngine = this.sslContext.createSSLEngine();
+    SSLParameters sslParams = sslEngine.getSSLParameters();
+    sslParams.setServerNames(List.of(new SNIHostName(host)));
+    sslEngine.setSSLParameters(sslParams);
+    sslEngine.setUseClientMode(true);
+    return sslEngine;
   }
 }
