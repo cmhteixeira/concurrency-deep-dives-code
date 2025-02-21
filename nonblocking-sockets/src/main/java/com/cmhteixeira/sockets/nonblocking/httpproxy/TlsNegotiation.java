@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.Optional;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 
@@ -23,18 +24,27 @@ public class TlsNegotiation {
   private ByteBuffer writeEncryptedBuffer;
   private MyInputStream inputStream;
 
-  public TlsNegotiation(SSLEngine sslEngine, SocketChannel socketChannel) {
+  public TlsNegotiation(
+      SSLEngine sslEngine,
+      SocketChannel socketChannel,
+      Integer sizeAppRead,
+      Integer sizePacketRead,
+      Integer sizePacketWrite) {
     this.sslEngine = sslEngine;
+    var session = sslEngine.getSession();
     this.socketChannel = socketChannel;
     this.readPlainBuffer =
-        ByteBuffer.allocateDirect(sslEngine.getSession().getApplicationBufferSize());
+        ByteBuffer.allocateDirect(size(sizeAppRead, session.getApplicationBufferSize()));
     this.readEncryptedBuffer =
-        ByteBuffer.allocateDirect(sslEngine.getSession().getPacketBufferSize());
-    this.writePlainBuffer =
-        ByteBuffer.allocateDirect(sslEngine.getSession().getApplicationBufferSize());
+        ByteBuffer.allocateDirect(size(sizePacketRead, session.getPacketBufferSize()));
+    this.writePlainBuffer = ByteBuffer.allocateDirect(session.getApplicationBufferSize());
     this.writeEncryptedBuffer =
-        ByteBuffer.allocateDirect(sslEngine.getSession().getPacketBufferSize());
+        ByteBuffer.allocateDirect(size(sizePacketWrite, session.getPacketBufferSize()));
     this.inputStream = new MyInputStream();
+  }
+
+  private Integer size(Integer maybeNull, Integer defaultValue) {
+    return Optional.ofNullable(maybeNull).filter(o -> o >= defaultValue).orElse(defaultValue);
   }
 
   public void write(ByteBuffer src) throws IOException {

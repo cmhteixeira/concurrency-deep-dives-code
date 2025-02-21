@@ -16,9 +16,26 @@ import rawhttp.core.*;
 public class HttpClientImpl implements HttpClient {
 
   private final SSLContext sslContext;
+  private final Integer bufferSizeAppRead;
+  private final Integer bufferSizePacketRead;
+  private final Integer bufferSizePacketWrite;
 
   public HttpClientImpl(SSLContext sslContext) {
     this.sslContext = sslContext;
+    this.bufferSizeAppRead = null; // defaults will be used
+    this.bufferSizePacketRead = null; // defaults will be used
+    this.bufferSizePacketWrite = null; // defaults will be used
+  }
+
+  public HttpClientImpl(
+      SSLContext sslContext,
+      int bufferSizeAppRead,
+      int bufferSizePacketRead,
+      int bufferSizePacketWrite) {
+    this.sslContext = sslContext;
+    this.bufferSizeAppRead = bufferSizeAppRead;
+    this.bufferSizePacketRead = bufferSizePacketRead;
+    this.bufferSizePacketWrite = bufferSizePacketWrite;
   }
 
   @Override
@@ -27,7 +44,13 @@ public class HttpClientImpl implements HttpClient {
     SocketChannel socketChannel = SocketChannel.open();
     socketChannel.configureBlocking(true);
     socketChannel.connect(new InetSocketAddress(req.getUri().getHost(), req.getUri().getPort()));
-    TlsNegotiation tlsNegotiation = new TlsNegotiation(sslEngine, socketChannel);
+    TlsNegotiation tlsNegotiation =
+        new TlsNegotiation(
+            sslEngine,
+            socketChannel,
+            bufferSizeAppRead,
+            bufferSizePacketRead,
+            bufferSizePacketWrite);
     tlsNegotiation.write(ByteBuffer.wrap(req.toString().getBytes(StandardCharsets.UTF_8)));
     RawHttp rwaHttp = new RawHttp();
     return rwaHttp.parseResponse(tlsNegotiation.getInputStream());

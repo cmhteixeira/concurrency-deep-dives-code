@@ -2,16 +2,14 @@ package com.cmhteixeira.sockets.nonblocking.httpclient;
 
 import com.cmhteixeira.sockets.nonblocking.httpproxy.TestingApp;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -48,7 +46,7 @@ public class HttpClientImplTestTest {
         "www.reuters.com",
         "www.bloomberg.com",
       })
-  void httpsRequests(String host) throws IOException, InterruptedException, URISyntaxException {
+  void httpsRequests(String host) throws Exception {
     URI uri = new URI("https", null, host, 443, "/", null, null);
     RawHttpResponse<Void> response =
         httpClient.send(
@@ -67,12 +65,13 @@ public class HttpClientImplTestTest {
 
   @ParameterizedTest
   @MethodSource("hostsAndBufferSizes")
-  void httpsRequests2(String host, short a, short b, short c)
-      throws IOException, InterruptedException, URISyntaxException {
+  void httpsRequests2(String host, int a, int b, int c) throws Exception {
     URI uri = new URI("https", null, host, 443, "/", null, null);
     HttpClient httpClient2 =
+        new HttpClientImpl(
+            TestingApp.defaultSslContext(), a * 16 * 1024, b * 16 * 1024, c * 16 * 1024);
     RawHttpResponse<Void> response =
-        httpClient.send(
+        httpClient2.send(
             new RawHttpRequest(
                 new RequestLine("GET", uri, HttpVersion.HTTP_1_1),
                 RawHttpHeaders.newBuilder()
@@ -87,8 +86,8 @@ public class HttpClientImplTestTest {
   }
 
   private static Stream<Arguments> hostsAndBufferSizes() {
-    Stream<String> hosts =
-        Stream.of(
+    List<String> hosts =
+        List.of(
             "www.foreignaffairs.com",
             "www.foreignpolicy.com",
             "www.observador.pt",
@@ -101,15 +100,16 @@ public class HttpClientImplTestTest {
             "www.reuters.com",
             "www.bloomberg.com");
 
-    Stream<Integer> applicationBufferRead = IntStream.range(1, 11).boxed();
-    Stream<Integer> packetBufferRead = IntStream.range(1, 11).boxed();
-    Stream<Integer> packetBufferWrite = IntStream.range(1, 11).boxed();
+    List<Integer> oneToTen = IntStream.range(1, 4).boxed().toList();
 
-    return hosts.flatMap(
-        host ->
-            applicationBufferRead.flatMap(
-                a ->
-                    packetBufferRead.flatMap(
-                        b -> packetBufferWrite.map(c -> Arguments.of(host, a, b, c)))));
+    return hosts.stream()
+        .flatMap(
+            host ->
+                oneToTen.stream()
+                    .flatMap(
+                        a ->
+                            oneToTen.stream()
+                                .flatMap(
+                                    b -> oneToTen.stream().map(c -> Arguments.of(host, a, b, c)))));
   }
 }
