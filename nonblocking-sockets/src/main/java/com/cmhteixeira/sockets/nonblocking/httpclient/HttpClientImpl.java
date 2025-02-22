@@ -7,7 +7,6 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.List;
 import javax.net.ssl.*;
-
 import rawhttp.core.*;
 
 public class HttpClientImpl implements HttpClient {

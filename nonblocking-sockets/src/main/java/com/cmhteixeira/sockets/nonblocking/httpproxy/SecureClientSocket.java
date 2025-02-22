@@ -97,8 +97,8 @@ public class SecureClientSocket {
           yield res.bytesProduced();
         } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
-      case BUFFER_OVERFLOW ->
-          throw new IllegalStateException("Don't know what to do... BUFFER_OVERFLOW");
+      case BUFFER_OVERFLOW -> throw new IllegalStateException(
+          "Don't know what to do... BUFFER_OVERFLOW");
       case OK -> {
         SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
         System.out.println(res);
@@ -152,10 +152,10 @@ public class SecureClientSocket {
     }
 
     switch (status) {
-      case BUFFER_UNDERFLOW ->
-          throw new IllegalStateException("Don't know what to do ...BUFFER_UNDERFLOW");
-      case BUFFER_OVERFLOW ->
-          throw new IllegalStateException("Don't know what to do ...BUFFER_OVERFLOW");
+      case BUFFER_UNDERFLOW -> throw new IllegalStateException(
+          "Don't know what to do ...BUFFER_UNDERFLOW");
+      case BUFFER_OVERFLOW -> throw new IllegalStateException(
+          "Don't know what to do ...BUFFER_OVERFLOW");
       case OK -> {
         printWriteBuffers();
         write();
@@ -176,21 +176,29 @@ public class SecureClientSocket {
 
   private void recursiveNegotiaton(HandshakeStatus handshakeStatus, Status status, int iter)
       throws IOException {
-    if (iter > 20) throw new RuntimeException("Something is up... couldn't complete handshake..");
+    System.out.println("############ Start new iteration ################");
+    System.out.printf("%s + %s\n", status, handshakeStatus);
 
-    System.out.println("############################");
-    System.out.printf("Status=%s + HandshakeStatus=%s\n", status, handshakeStatus);
-    if (status == OK && handshakeStatus == FINISHED) {
-      System.out.println("Read: FINISHED");
-    } else if (status == OK && handshakeStatus == NEED_TASK) {
-      System.out.println("Read: NEED TASK");
-      Runnable task = sslEngine.getDelegatedTask(); // should not block current thread
+    if (status == CLOSED) throw new RuntimeException("Got CLOSED when handshaking.");
+
+    if (handshakeStatus == FINISHED) {
+      printAllBuffers();
+      System.out.println("Handshake finished.");
+    }
+
+    if (handshakeStatus == NOT_HANDSHAKING) {
+      throw new IllegalStateException("Should be impossible to reach this state.");
+    }
+
+    if (handshakeStatus == NEED_UNWRAP_AGAIN) {
+      throw new IllegalStateException("Got NEED_UNWRAP_AGAIN but that should only apply for UDP.");
+    }
+
+    if (status == OK && handshakeStatus == NEED_TASK) {
+      Runnable task = sslEngine.getDelegatedTask();
       task.run();
       recursiveNegotiaton(sslEngine.getHandshakeStatus(), OK, iter + 1);
-    } else if (status == OK && handshakeStatus == NOT_HANDSHAKING) {
-      System.out.println("Read: NOT HANDSHAKING");
     } else if (status == BUFFER_UNDERFLOW && handshakeStatus == NEED_UNWRAP) {
-      System.out.println("Read. UNDERFLOW. NEED UNWRAP");
       System.out.println("Before compacting: " + readEncryptedBuffer);
       readEncryptedBuffer.compact();
       System.out.println("After compacting: " + readEncryptedBuffer);
@@ -203,7 +211,6 @@ public class SecureClientSocket {
       recursiveNegotiaton(
           sslEngineResult.getHandshakeStatus(), sslEngineResult.getStatus(), iter + 1);
     } else if (status == OK && handshakeStatus == NEED_UNWRAP) {
-      System.out.println("Read: NEED UNWRAP");
       if (!(readEncryptedBuffer.hasRemaining() && readEncryptedBuffer.position() != 0)) {
         System.out.println("Reading ...");
         readEncryptedBuffer.clear();
@@ -215,10 +222,7 @@ public class SecureClientSocket {
       System.out.println(readEncryptedBuffer);
       recursiveNegotiaton(
           sslEngineResult.getHandshakeStatus(), sslEngineResult.getStatus(), iter + 1);
-    } else if (status == OK && handshakeStatus == NEED_UNWRAP_AGAIN) {
-      System.out.println("Read: NEED UNWRAP AGAIN");
     } else if (status == OK && handshakeStatus == NEED_WRAP) {
-      System.out.println("Read: NEED WRAP");
       writeEncryptedBuffer.clear();
       writePlainBuffer.clear();
       SSLEngineResult sslEngineResult = sslEngine.wrap(writePlainBuffer, writeEncryptedBuffer);
@@ -227,10 +231,7 @@ public class SecureClientSocket {
       System.out.println(sslEngineResult);
       recursiveNegotiaton(
           sslEngineResult.getHandshakeStatus(), sslEngineResult.getStatus(), iter + 1);
-    } else if (status == CLOSED) {
-      System.out.println("Read: CLOSED");
     } else if (status == BUFFER_UNDERFLOW) {
-      System.out.println("Read: BUFFER UNDERFLOW");
       read();
       SSLEngineResult sslEngineResult =
           sslEngine.unwrap(readEncryptedBuffer.flip(), readPlainBuffer);
@@ -238,7 +239,6 @@ public class SecureClientSocket {
       recursiveNegotiaton(
           sslEngineResult.getHandshakeStatus(), sslEngineResult.getStatus(), iter + 1);
     } else if (status == BUFFER_OVERFLOW) {
-      System.out.println("Read: BUFFER OVERFLOW");
     }
   }
 

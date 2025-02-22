@@ -65,7 +65,7 @@ public class HttpClientImplTestTest {
 
   @ParameterizedTest
   @MethodSource("hostsAndBufferSizes")
-  void httpsRequests2(String host, int a, int b, int c) throws Exception {
+  void httpsRequestsWithBufferSize(String host, int a, int b, int c) throws Exception {
     URI uri = new URI("https", null, host, 443, "/", null, null);
     HttpClient httpClient2 =
         new HttpClientImpl(
