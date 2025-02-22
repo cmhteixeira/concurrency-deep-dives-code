@@ -2,10 +2,10 @@ package com.cmhteixeira.sockets.nonblocking.httpclient;
 
 import com.cmhteixeira.sockets.nonblocking.httpproxy.TlsNegotiation;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SSLContext;
@@ -51,9 +51,11 @@ public class HttpClientImpl implements HttpClient {
             bufferSizeAppRead,
             bufferSizePacketRead,
             bufferSizePacketWrite);
-    tlsNegotiation.write(ByteBuffer.wrap(req.toString().getBytes(StandardCharsets.UTF_8)));
+    InputStream in = tlsNegotiation.getInputStream();
+    OutputStream out = tlsNegotiation.getOutputStream();
+    req.writeTo(out);
     RawHttp rwaHttp = new RawHttp();
-    return rwaHttp.parseResponse(tlsNegotiation.getInputStream());
+    return rwaHttp.parseResponse(in);
   }
 
   private SSLEngine configureSSLEngine(String host) {

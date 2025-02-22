@@ -11,6 +11,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 
@@ -24,6 +25,8 @@ public class TlsNegotiation {
   private ByteBuffer writePlainBuffer;
   private ByteBuffer writeEncryptedBuffer;
   private TlsSocketInputStream inputStream;
+  private TlsSocketOutputStream outputStream;
+  private final AtomicBoolean singleHandshake = new AtomicBoolean(false);
 
   public TlsNegotiation(
       SSLEngine sslEngine,
@@ -42,30 +45,21 @@ public class TlsNegotiation {
     this.writeEncryptedBuffer =
         ByteBuffer.allocateDirect(size(sizePacketWrite, session.getPacketBufferSize()));
     this.inputStream = new TlsSocketInputStream();
+    this.outputStream = new TlsSocketOutputStream();
   }
 
   private Integer size(Integer maybeNull, Integer defaultValue) {
     return Optional.ofNullable(maybeNull).filter(o -> o >= defaultValue).orElse(defaultValue);
   }
 
-  public void write(ByteBuffer src) throws IOException {
-    if (src.capacity() > writeEncryptedBuffer.capacity())
-      throw new IllegalArgumentException("Too much... feed me less");
-
-    SSLEngineResult sslEngineResult = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
-    recursiveNegotiaton(sslEngineResult.getHandshakeStatus(), sslEngineResult.getStatus(), 0);
-    System.out.println("Finished negotiation ...");
-
-    printWriteBuffers();
-
-    writeEncryptedBuffer.clear(); // yes
-    writePlainBuffer.clear(); // yes
-    writePlainBuffer.put(src); // TODO: This is expensive, right? Is there a better way?
-    writePlainBuffer.flip();
-    SSLEngineResult res = sslEngine.wrap(writePlainBuffer, writeEncryptedBuffer);
-    recursiveSend(res.getHandshakeStatus(), res.getStatus(), 0);
-    printWriteBuffers();
-    System.out.println("Finished writing ...");
+  private void handshakeIfRequired() throws IOException {
+    if (singleHandshake.get()) return;
+    if (!singleHandshake.compareAndSet(false, true)) handshakeIfRequired();
+    else {
+      SSLEngineResult sslEngineResult = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
+      recursiveNegotiaton(sslEngineResult.getHandshakeStatus(), sslEngineResult.getStatus(), 0);
+      System.out.println("Finished negotiation ...");
+    }
   }
 
   public InputStream getInputStream() {
@@ -73,12 +67,16 @@ public class TlsNegotiation {
     return inputStream;
   }
 
+  public OutputStream getOutputStream() {
+    return outputStream;
+  }
+
   private int recursiveRead(HandshakeStatus handshakeStatus, Status status, int iter)
       throws IOException {
 
     System.out.println("Recursive read. Iter: " + iter);
     if (handshakeStatus != FINISHED && handshakeStatus != NOT_HANDSHAKING) {
-      throw new RuntimeException("New Handshake required??");
+      throw new UnsupportedOperationException("Not possible to RE-handshake.");
     }
 
     printReadBuffers();
@@ -95,8 +93,8 @@ public class TlsNegotiation {
           yield res.bytesProduced();
         } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
-      case BUFFER_OVERFLOW ->
-          throw new IllegalStateException("Don't know what to do... BUFFER_OVERFLOW");
+      case BUFFER_OVERFLOW -> throw new IllegalStateException(
+          "Don't know what to do... BUFFER_OVERFLOW");
       case OK -> {
         SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
         System.out.println(res);
@@ -132,10 +130,10 @@ public class TlsNegotiation {
     System.out.println("###############");
   }
 
-  private void recursiveSend(HandshakeStatus handshakeStatus, Status status, int iter)
+  private void recursiveWrite(HandshakeStatus handshakeStatus, Status status, int iter)
       throws IOException {
     if (handshakeStatus != FINISHED && handshakeStatus != NOT_HANDSHAKING) {
-      throw new RuntimeException("New Handshake required??");
+      throw new UnsupportedOperationException("Not possible to RE-handshake.");
     }
 
     System.out.println("Iter: " + iter);
@@ -150,21 +148,21 @@ public class TlsNegotiation {
     }
 
     switch (status) {
-      case BUFFER_UNDERFLOW ->
-          throw new IllegalStateException("Don't know what to do ...BUFFER_UNDERFLOW");
-      case BUFFER_OVERFLOW ->
-          throw new IllegalStateException("Don't know what to do ...BUFFER_OVERFLOW");
+      case BUFFER_UNDERFLOW -> throw new IllegalStateException(
+          "Don't know what to do ...BUFFER_UNDERFLOW");
+      case BUFFER_OVERFLOW -> throw new IllegalStateException(
+          "Don't know what to do ...BUFFER_OVERFLOW");
       case OK -> {
         printWriteBuffers();
         write();
         printWriteBuffers();
         if (writeEncryptedBuffer.hasRemaining()) {
           System.out.println("WARNING...");
-          recursiveSend(handshakeStatus, status, iter + 1);
+          recursiveWrite(handshakeStatus, status, iter + 1);
         } else if (writePlainBuffer.hasRemaining()) {
           writeEncryptedBuffer.clear();
           SSLEngineResult res = sslEngine.unwrap(writePlainBuffer, writeEncryptedBuffer);
-          recursiveSend(res.getHandshakeStatus(), res.getStatus(), iter + 1);
+          recursiveWrite(res.getHandshakeStatus(), res.getStatus(), iter + 1);
         } else {
         }
       }
@@ -254,14 +252,31 @@ public class TlsNegotiation {
 
   private class TlsSocketOutputStream extends OutputStream {
 
+    private TlsSocketOutputStream() {}
+
     @Override
-    public void write(int b) throws IOException {}
+    public void write(int b) throws IOException {
+      ByteBuffer byteBuffer = ByteBuffer.allocate(1);
+      byte theByte = (byte) b;
+      byteBuffer.put(theByte);
+      write(byteBuffer.array());
+    }
 
     @Override
     public void write(byte[] b, int off, int len) throws IOException {
-      var previousPlainWrite = writePlainBuffer;
+      if (off < 0 || len < 0 || off + len > b.length)
+        throw new IndexOutOfBoundsException("Invalid offset or length.");
+      if (len == 0) return;
+      handshakeIfRequired();
+      ByteBuffer previousPlainWrite = writePlainBuffer;
       writePlainBuffer = ByteBuffer.wrap(b, off, len);
-      super.write(b, off, len);
+      writeEncryptedBuffer.clear();
+      SSLEngineResult res = sslEngine.wrap(writePlainBuffer, writeEncryptedBuffer);
+      recursiveWrite(res.getHandshakeStatus(), res.getStatus(), 0);
+      writePlainBuffer = previousPlainWrite;
+      if (writeEncryptedBuffer.hasRemaining()) {
+        throw new IllegalStateException("Write Packet Buffer should have no remaining bytes.");
+      }
     }
 
     @Override
@@ -277,6 +292,7 @@ public class TlsNegotiation {
 
   private class TlsSocketInputStream extends InputStream {
     private void readInternal() throws IOException {
+      handshakeIfRequired();
       recursiveRead(NOT_HANDSHAKING, OK, 0);
       printReadBuffers();
       readPlainBuffer.flip();
@@ -312,6 +328,17 @@ public class TlsNegotiation {
       }
       readPlainBuffer.get(b, off, len);
       return toRead;
+    }
+
+    @Override
+    public int available() {
+      // todo: Check if closed?
+      return readPlainBuffer.remaining();
+    }
+
+    @Override
+    public void close() throws IOException {
+      // Todo: close stream?
     }
   }
 }
