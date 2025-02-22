@@ -8,6 +8,7 @@ import static javax.net.ssl.SSLEngineResult.Status.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Optional;
@@ -15,28 +16,31 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 
-public class TlsNegotiation {
+public class SecureClientSocket {
 
-  private SSLEngine sslEngine;
-  private SocketChannel socketChannel;
+  private final SSLEngine sslEngine;
+  private final SocketChannel socketChannel;
 
-  private ByteBuffer readPlainBuffer;
-  private ByteBuffer readEncryptedBuffer;
+  private final ByteBuffer readPlainBuffer;
+  private final ByteBuffer readEncryptedBuffer;
   private ByteBuffer writePlainBuffer;
-  private ByteBuffer writeEncryptedBuffer;
-  private TlsSocketInputStream inputStream;
-  private TlsSocketOutputStream outputStream;
+  private final ByteBuffer writeEncryptedBuffer;
+  private final TlsSocketInputStream inputStream;
+  private final TlsSocketOutputStream outputStream;
   private final AtomicBoolean singleHandshake = new AtomicBoolean(false);
 
-  public TlsNegotiation(
+  public SecureClientSocket(
       SSLEngine sslEngine,
-      SocketChannel socketChannel,
+      InetSocketAddress ipAddress,
       Integer sizeAppRead,
       Integer sizePacketRead,
-      Integer sizePacketWrite) {
+      Integer sizePacketWrite)
+      throws IOException {
+    this.socketChannel = SocketChannel.open();
+    socketChannel.configureBlocking(true);
+    socketChannel.connect(ipAddress);
     this.sslEngine = sslEngine;
     var session = sslEngine.getSession();
-    this.socketChannel = socketChannel;
     this.readPlainBuffer =
         ByteBuffer.allocateDirect(size(sizeAppRead, session.getApplicationBufferSize()));
     this.readEncryptedBuffer =
@@ -93,8 +97,8 @@ public class TlsNegotiation {
           yield res.bytesProduced();
         } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
-      case BUFFER_OVERFLOW -> throw new IllegalStateException(
-          "Don't know what to do... BUFFER_OVERFLOW");
+      case BUFFER_OVERFLOW ->
+          throw new IllegalStateException("Don't know what to do... BUFFER_OVERFLOW");
       case OK -> {
         SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
         System.out.println(res);
@@ -148,10 +152,10 @@ public class TlsNegotiation {
     }
 
     switch (status) {
-      case BUFFER_UNDERFLOW -> throw new IllegalStateException(
-          "Don't know what to do ...BUFFER_UNDERFLOW");
-      case BUFFER_OVERFLOW -> throw new IllegalStateException(
-          "Don't know what to do ...BUFFER_OVERFLOW");
+      case BUFFER_UNDERFLOW ->
+          throw new IllegalStateException("Don't know what to do ...BUFFER_UNDERFLOW");
+      case BUFFER_OVERFLOW ->
+          throw new IllegalStateException("Don't know what to do ...BUFFER_OVERFLOW");
       case OK -> {
         printWriteBuffers();
         write();

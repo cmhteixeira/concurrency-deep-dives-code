@@ -1,16 +1,13 @@
 package com.cmhteixeira.sockets.nonblocking.httpclient;
 
-import com.cmhteixeira.sockets.nonblocking.httpproxy.TlsNegotiation;
+import com.cmhteixeira.sockets.nonblocking.httpproxy.SecureClientSocket;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.nio.channels.SocketChannel;
 import java.util.List;
-import javax.net.ssl.SNIHostName;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLParameters;
+import javax.net.ssl.*;
+
 import rawhttp.core.*;
 
 public class HttpClientImpl implements HttpClient {
@@ -41,18 +38,15 @@ public class HttpClientImpl implements HttpClient {
   @Override
   public RawHttpResponse<Void> send(RawHttpRequest req) throws IOException {
     SSLEngine sslEngine = configureSSLEngine(req.getUri().getHost());
-    SocketChannel socketChannel = SocketChannel.open();
-    socketChannel.configureBlocking(true);
-    socketChannel.connect(new InetSocketAddress(req.getUri().getHost(), req.getUri().getPort()));
-    TlsNegotiation tlsNegotiation =
-        new TlsNegotiation(
+    SecureClientSocket secureClientSocket =
+        new SecureClientSocket(
             sslEngine,
-            socketChannel,
+            new InetSocketAddress(req.getUri().getHost(), req.getUri().getPort()),
             bufferSizeAppRead,
             bufferSizePacketRead,
             bufferSizePacketWrite);
-    InputStream in = tlsNegotiation.getInputStream();
-    OutputStream out = tlsNegotiation.getOutputStream();
+    InputStream in = secureClientSocket.getInputStream();
+    OutputStream out = secureClientSocket.getOutputStream();
     req.writeTo(out);
     RawHttp rwaHttp = new RawHttp();
     return rwaHttp.parseResponse(in);
