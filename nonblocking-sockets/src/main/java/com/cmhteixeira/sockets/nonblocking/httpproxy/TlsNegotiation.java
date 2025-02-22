@@ -7,6 +7,7 @@ import static javax.net.ssl.SSLEngineResult.Status.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Optional;
@@ -22,7 +23,7 @@ public class TlsNegotiation {
   private ByteBuffer readEncryptedBuffer;
   private ByteBuffer writePlainBuffer;
   private ByteBuffer writeEncryptedBuffer;
-  private MyInputStream inputStream;
+  private TlsSocketInputStream inputStream;
 
   public TlsNegotiation(
       SSLEngine sslEngine,
@@ -40,7 +41,7 @@ public class TlsNegotiation {
     this.writePlainBuffer = ByteBuffer.allocateDirect(session.getApplicationBufferSize());
     this.writeEncryptedBuffer =
         ByteBuffer.allocateDirect(size(sizePacketWrite, session.getPacketBufferSize()));
-    this.inputStream = new MyInputStream();
+    this.inputStream = new TlsSocketInputStream();
   }
 
   private Integer size(Integer maybeNull, Integer defaultValue) {
@@ -94,8 +95,8 @@ public class TlsNegotiation {
           yield res.bytesProduced();
         } else yield recursiveRead(res.getHandshakeStatus(), res.getStatus(), iter + 1);
       }
-      case BUFFER_OVERFLOW -> throw new IllegalStateException(
-          "Don't know what to do... BUFFER_OVERFLOW");
+      case BUFFER_OVERFLOW ->
+          throw new IllegalStateException("Don't know what to do... BUFFER_OVERFLOW");
       case OK -> {
         SSLEngineResult res = sslEngine.unwrap(readEncryptedBuffer, readPlainBuffer);
         System.out.println(res);
@@ -149,10 +150,10 @@ public class TlsNegotiation {
     }
 
     switch (status) {
-      case BUFFER_UNDERFLOW -> throw new IllegalStateException(
-          "Don't know what to do ...BUFFER_UNDERFLOW");
-      case BUFFER_OVERFLOW -> throw new IllegalStateException(
-          "Don't know what to do ...BUFFER_OVERFLOW");
+      case BUFFER_UNDERFLOW ->
+          throw new IllegalStateException("Don't know what to do ...BUFFER_UNDERFLOW");
+      case BUFFER_OVERFLOW ->
+          throw new IllegalStateException("Don't know what to do ...BUFFER_OVERFLOW");
       case OK -> {
         printWriteBuffers();
         write();
@@ -251,7 +252,30 @@ public class TlsNegotiation {
     System.out.printf("After reading %d: %s\n", bytesRead, readEncryptedBuffer);
   }
 
-  private class MyInputStream extends InputStream {
+  private class TlsSocketOutputStream extends OutputStream {
+
+    @Override
+    public void write(int b) throws IOException {}
+
+    @Override
+    public void write(byte[] b, int off, int len) throws IOException {
+      var previousPlainWrite = writePlainBuffer;
+      writePlainBuffer = ByteBuffer.wrap(b, off, len);
+      super.write(b, off, len);
+    }
+
+    @Override
+    public void close() throws IOException {
+      // does nothing. Should we be shutting down the socket?
+    }
+
+    @Override
+    public void flush() throws IOException {
+      // does nothing. Should this be changed?
+    }
+  }
+
+  private class TlsSocketInputStream extends InputStream {
     private void readInternal() throws IOException {
       recursiveRead(NOT_HANDSHAKING, OK, 0);
       printReadBuffers();
