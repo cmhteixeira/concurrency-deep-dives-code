@@ -44,9 +44,9 @@ public class HttpClientImpl implements HttpClient {
             bufferSizeAppRead,
             bufferSizePacketRead,
             bufferSizePacketWrite);
-    InputStream in = secureClientSocket.getInputStream();
     OutputStream out = secureClientSocket.getOutputStream();
     req.writeTo(out);
+    InputStream in = secureClientSocket.getInputStream();
     RawHttp rwaHttp = new RawHttp();
     return rwaHttp.parseResponse(in);
   }
